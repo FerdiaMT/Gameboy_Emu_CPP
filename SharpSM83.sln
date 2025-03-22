@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.11.35303.130
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SharpSM83", "SharpSM83\SharpSM83.vcxproj", "{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}.Debug|x64.ActiveCfg = Debug|x64
+		{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}.Debug|x64.Build.0 = Debug|x64
+		{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}.Debug|x86.ActiveCfg = Debug|Win32
+		{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}.Debug|x86.Build.0 = Debug|Win32
+		{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}.Release|x64.ActiveCfg = Release|x64
+		{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}.Release|x64.Build.0 = Release|x64
+		{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}.Release|x86.ActiveCfg = Release|Win32
+		{1DEA2558-B94D-4F42-8396-F0EAA2E24CDD}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {743068BE-3F2C-4B72-9465-0B712743BBE1}
+	EndGlobalSection
+EndGlobal
