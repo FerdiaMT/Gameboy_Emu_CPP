@@ -26,6 +26,12 @@ uint16_t Memory::readWord(uint16_t& address)
 	return data;
 }
 
+void Memory::writeWord(uint16_t& address, uint16_t data)
+{
+	ram[address] = data & 0xFF;
+	ram[address+1] = ((data >>8) & 0x00FF);
+}
+
 void Memory::write(uint16_t address, uint8_t data)
 {
 	ram[address] = data;

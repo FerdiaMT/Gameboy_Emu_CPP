@@ -13,6 +13,7 @@ registers reg;
 // - on gbdev for  carry for inc/dec byte, 
 // - on gbdev for zero in addTwoReg
 // - stop and halt have a "low power mode" ? 0x10 0x76
+// - 0xCB prefix mode : (
 
 /*
 * Z ~ Zero flag (set if result of operation is 0)
@@ -172,6 +173,23 @@ void addWordReg(uint16_t& r16a, uint16_t r16b)
 	r16a = r16Val;
 }
 
+void addWordRegSigned(uint16_t& r16a, int8_t r8b)
+{
+	clearFlags();
+
+	uint16_t r16Val = r16a + r8b;
+	if (r16a + r8b > 0xFFFF) {
+		setCarryFlag();
+	}
+	if (r16Val == 0) {
+		setZeroFlag();
+	}
+	if (((r8b & 0xFFF) + (r16a & 0xFFF)) > 0xFFF) {
+		setHalfFlag();  // Set Half Carry flag (bit 5)
+	}
+	r16a = r16Val;
+}
+
 void addByteReg(uint8_t& r8a , uint8_t r8b)
 {
 	clearFlags();
@@ -213,6 +231,109 @@ void addCarryByteReg(uint8_t& r8a, uint8_t r8b)
 
 	r8a = r8Val;
 }
+
+void subByteReg(uint8_t& r8a , uint8_t r8b)
+{
+	clearFlags();
+	setNegFlag();
+	uint8_t r8Val = r8a - r8b;
+	if (r8b > r8a)
+	{
+		setCarryFlag();
+	}
+	if (r8Val == 0)
+	{
+		setZeroFlag();
+	}
+	if ((r8a & 0x0F) < (r8b & 0x0F)) {
+		setHalfFlag();
+	}
+
+	r8a = r8Val;
+}
+
+void subCarryByteReg(uint8_t& r8a, uint8_t r8b)
+{
+	uint8_t isCarry = 0;
+	if (isCarryFlag()) isCarry = 1;
+
+	clearFlags();
+	setNegFlag();
+	uint8_t r8Val = r8a - r8b - isCarry;
+	if (r8b+isCarry > r8a)
+	{
+		setCarryFlag();
+	}
+	if (r8Val == 0)
+	{
+		setZeroFlag();
+	}
+	if (((r8a & 0x0F) + isCarry) > (r8b & 0x0F)) {
+		setHalfFlag();
+	}
+
+	r8a = r8Val;
+}
+
+void andByteReg(uint8_t& r8a, uint8_t r8b)
+{
+	clearFlags();
+	setHalfFlag();
+	r8a = r8a & r8b;
+	if (r8a == 0x0)setZeroFlag();
+}
+
+void xorByteReg(uint8_t& r8a, uint8_t r8b)
+{
+	clearFlags();
+	r8a = r8a ^ r8b;
+	if (r8a == 0x0)setZeroFlag();
+}
+
+void orByteReg(uint8_t& r8a, uint8_t r8b)
+{
+	clearFlags();
+	r8a = r8a | r8b;
+	if (r8a == 0x0)setZeroFlag();
+}
+
+void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
+{//basically only cares about flags
+	clearFlags();
+	setNegFlag();
+	uint8_t r8Val = r8a - r8b;
+	if (r8b > r8a)
+	{
+		setCarryFlag();
+	}
+	if (r8Val == 0)
+	{
+		setZeroFlag();
+	}
+	if ((r8a & 0x0F) < (r8b & 0x0F)) {
+		setHalfFlag();
+	}
+}
+
+uint16_t SM83::popStack()
+{
+	uint16_t word  = memory.readWord(reg.SP);
+	reg.SP += 2;
+	return word;
+}
+
+void SM83::call(uint16_t jumpAddr)
+{
+	reg.SP -= 2;//minus two bytes for word
+	memory.writeWord(reg.SP, reg.PC);
+	reg.PC = jumpAddr;
+}
+void SM83::push(uint16_t pushData)
+{
+	reg.SP--;
+	memory.writeWord(reg.SP, pushData);
+}
+
 
 void SM83::execute(uint8_t opcode)
 {
@@ -771,6 +892,410 @@ void SM83::execute(uint8_t opcode)
 		addCarryByteReg(reg.A, reg.A);
 	} break;
 
+	//====0x9?======SUB========================================================
+
+	case 0x90: {
+		subByteReg(reg.A, reg.B);
+	} break;
+	case 0x91: {
+		subByteReg(reg.A, reg.C);
+	} break;
+	case 0x92: {
+		subByteReg(reg.A, reg.D);
+	} break;
+	case 0x93: {
+		subByteReg(reg.A, reg.E);
+	} break;
+	case 0x94: {
+		subByteReg(reg.A, reg.H);
+	} break;
+	case 0x95: {
+		subByteReg(reg.A, reg.L);
+	} break;
+	case 0x96: {
+		subByteReg(reg.A, memory.view(reg.HL));
+	} break;
+	case 0x97: {
+		subByteReg(reg.A, reg.A);
+	} break;
+	case 0x98: { // start of ADC (add w/ carry flag)
+		subCarryByteReg(reg.A, reg.B);
+	} break;
+	case 0x99: {
+		subCarryByteReg(reg.A, reg.C);
+	} break;
+	case 0x9A: {
+		subCarryByteReg(reg.A, reg.D);
+	} break;
+	case 0x9B: {
+		subCarryByteReg(reg.A, reg.E);
+	} break;
+	case 0x9C: {
+		subCarryByteReg(reg.A, reg.H);
+	} break;
+	case 0x9D: {
+		subCarryByteReg(reg.A, reg.L);
+	} break;
+	case 0x9E: {
+		subCarryByteReg(reg.A, memory.view(reg.HL));
+	} break;
+	case 0x9F: {
+		subCarryByteReg(reg.A, reg.A);
+	} break;
+
+	//====0xA?======AND XOR====================================================
+
+	case 0xA0: {
+		andByteReg(reg.A, reg.B);
+	} break;
+	case 0xA1: {
+		andByteReg(reg.A, reg.C);
+	} break;
+	case 0xA2: {
+		andByteReg(reg.A, reg.D);
+	} break;
+	case 0xA3: {
+		andByteReg(reg.A, reg.E);
+	} break;
+	case 0xA4: {
+		andByteReg(reg.A, reg.H);
+	} break;
+	case 0xA5: {
+		andByteReg(reg.A, reg.L);
+	} break;
+	case 0xA6: {
+		andByteReg(reg.A, memory.view(reg.HL));
+	} break;
+	case 0xA7: {
+		andByteReg(reg.A, reg.A);
+	} break;
+	case 0xA8: { // start of ADC (add w/ carry flag)
+		xorByteReg(reg.A, reg.B);
+	} break;
+	case 0xA9: {
+		xorByteReg(reg.A, reg.C);
+	} break;
+	case 0xAA: {
+		xorByteReg(reg.A, reg.D);
+	} break;
+	case 0xAB: {
+		xorByteReg(reg.A, reg.E);
+	} break;
+	case 0xAC: {
+		xorByteReg(reg.A, reg.H);
+	} break;
+	case 0xAD: {
+		xorByteReg(reg.A, reg.L);
+	} break;
+	case 0xAE: {
+		xorByteReg(reg.A, memory.view(reg.HL));
+	} break;
+	case 0xAF: {
+		xorByteReg(reg.A, reg.A);
+	} break;
+
+	//====0xB?======OR   CP====================================================
+
+	case 0xB0: {
+		orByteReg(reg.A, reg.B);
+	} break;
+	case 0xB1: {
+		orByteReg(reg.A, reg.C);
+	} break;
+	case 0xB2: {
+		orByteReg(reg.A, reg.D);
+	} break;
+	case 0xB3: {
+		orByteReg(reg.A, reg.E);
+	} break;
+	case 0xB4: {
+		orByteReg(reg.A, reg.H);
+	} break;
+	case 0xB5: {
+		orByteReg(reg.A, reg.L);
+	} break;
+	case 0xB6: {
+		orByteReg(reg.A, memory.view(reg.HL));
+	} break;
+	case 0xB7: {
+		orByteReg(reg.A, reg.A);
+	} break;
+	case 0xB8: { // start of ADC (add w/ carry flag)
+		compareByteReg(reg.A, reg.B);
+	} break;
+	case 0xB9: {
+		compareByteReg(reg.A, reg.C);
+	} break;
+	case 0xBA: {
+		compareByteReg(reg.A, reg.D);
+	} break;
+	case 0xBB: {
+		compareByteReg(reg.A, reg.E);
+	} break;
+	case 0xBC: {
+		compareByteReg(reg.A, reg.H);
+	} break;
+	case 0xBD: {
+		compareByteReg(reg.A, reg.L);
+	} break;
+	case 0xBE: {
+		compareByteReg(reg.A, memory.view(reg.HL));
+	} break;
+	case 0xBF: {//these are the same so just set flags here
+		clearFlags();
+		setZeroFlag();
+		setNegFlag();
+	} break;
+
+	//====0xC?======end of repetitive regs====================================================
+
+	case 0xC0: { // ret NZ 
+		if (!isZeroFlag())
+		{
+			reg.PC = popStack();
+		}
+	} break;
+	case 0xC1: {
+		reg.BC = popStack();
+	} break;
+	case 0xC2: {
+		uint16_t addr = memory.readWord(reg.PC);
+		if (!isZeroFlag())
+		{
+			reg.PC = addr;
+		}
+	} break;
+	case 0xC3: {
+		uint16_t addr = memory.readWord(reg.PC);
+		reg.PC = addr;
+	} break;
+	case 0xC4: {//call nz a16
+		uint16_t addr = memory.readWord(reg.PC);
+		if (!isZeroFlag())
+		{
+			call(addr);
+		}
+	} break;
+	case 0xC5: { // push BC 
+		push(reg.BC);
+	} break;
+	case 0xC6: { //ADD A n8
+		addByteReg(reg.A, memory.read(reg.PC));
+	} break;
+	case 0xC7: { //RST $00
+		call(0x00);
+	} break;
+	case 0xC8: { 
+		if (isZeroFlag())
+		{
+			reg.PC = popStack();
+		}
+	} break;
+	case 0xC9: {
+	//RETURN SUBROUTINE
+		reg.PC = popStack();
+	} break;
+	case 0xCA: {
+		uint16_t addr = memory.readWord(reg.PC);
+		if (isZeroFlag())
+		{
+			reg.PC = addr;
+		}
+	} break;
+	case 0xCB: { // sneaky 256 function thing
+		//DO THIS AFTER BREAK
+	} break;
+	case 0xCC: {
+		uint16_t addr = memory.readWord(reg.PC);
+		if (isZeroFlag())
+		{
+			call(addr);
+		}
+	} break;
+	case 0xCD: { // call n16
+		uint16_t jumpAddr = memory.readWord(reg.PC);
+		call(jumpAddr);
+	} break;
+	case 0xCE: {
+		addCarryByteReg(reg.A, memory.read(reg.PC));
+	} break;
+	case 0xCF: {
+		call(0x08);
+	} break;
+
+	//====0xD?===============================================================
+
+	case 0xD0: { // ret NZ 
+		if (!isCarryFlag())
+		{
+			reg.PC = popStack();
+		}
+	} break;
+	case 0xD1: {
+		reg.DE = popStack();
+	} break;
+	case 0xD2: {
+		uint16_t addr = memory.readWord(reg.PC);
+		if (!isCarryFlag())
+		{
+			reg.PC = addr;
+		}
+	} break;
+	case 0xD3: { //DO NOTHING
+	
+	} break;
+	case 0xD4: {//call nc a16
+		uint16_t addr = memory.readWord(reg.PC);
+		if (!isCarryFlag())
+		{
+			call(addr);
+		}
+	} break;
+	case 0xD5: { // push BC 
+		push(reg.DE);
+	} break;
+	case 0xD6: { //SUB A n8
+		subByteReg(reg.A, memory.read(reg.PC));
+	} break;
+	case 0xD7: { //RST $10
+		call(0x10);
+	} break;
+	case 0xD8: {
+		if (isCarryFlag())
+		{
+			reg.PC = popStack();
+		}
+	} break;
+	case 0xD9: {
+		//RETURN I  SUBROUTINE
+		reg.PC = popStack();
+		IME = true;
+	} break;
+	case 0xDA: {
+		uint16_t addr = memory.readWord(reg.PC);
+		if (isCarryFlag())
+		{
+			reg.PC = addr;
+		}
+	} break;
+	case 0xDB: { //empty
+	} break;
+	case 0xDC: {
+		uint16_t addr = memory.readWord(reg.PC);
+		if (isCarryFlag())
+		{
+			call(addr);
+		}
+	} break;
+	case 0xDD: { // empty
+	} break;
+	case 0xDE: {
+		subCarryByteReg(reg.A, memory.read(reg.PC));
+	} break;
+	case 0xDF: {
+		call(0x18);
+	} break;
+
+	//====0xE?===============================================================
+
+	case 0xE0: { // LDH [a8] a
+		uint8_t addr = memory.read(reg.PC);
+		uint16_t memAddr = addr + 0xFF00; // not sure on this part
+		memory.write(memAddr, reg.A);
+	} break;
+	case 0xE1: {
+		reg.HL = popStack();
+	} break;
+	case 0xE2: {
+		uint16_t memAddr = reg.C + 0xFF00; // not sure on this part
+		memory.write(memAddr, reg.A);
+	} break;
+	case 0xE3: { //DO NOTHING
+	} break;
+	case 0xE4: {//DO NOTHING
+	} break;
+	case 0xE5: { // push HL
+		push(reg.HL);
+	} break;
+	case 0xE6: { //AND A n8
+		andByteReg(reg.A, memory.read(reg.PC));
+	} break;
+	case 0xE7: { //RST $10
+		call(0x20);
+	} break;
+	case 0xE8: {//add sp ,e8
+		int8_t e8 = memory.read(reg.PC);
+		addWordRegSigned(reg.SP, e8);
+	} break;
+	case 0xE9: {
+		reg.PC = reg.HL;
+	} break;
+	case 0xEA: { // load to a16
+		uint16_t addr = memory.readWord(reg.PC);
+		memory.write(addr, reg.A);
+	} break;
+	case 0xEB: { //empty
+	} break;
+	case 0xEC: { //empty
+	} break;
+	case 0xED: { // empty
+	} break;
+	case 0xEE: {
+		xorByteReg(reg.A, memory.read(reg.PC));
+	} break;
+	case 0xEF: {
+		call(0x28);
+	} break;
+
+	//====0xF?===============================================================
+
+	case 0xF0: { // LDH  a [a8]
+		reg.A = memory.read(reg.PC);
+	} break;
+	case 0xF1: {
+		reg.AF = popStack();
+	} break;
+	case 0xF2: {
+		reg.C = memory.read(reg.PC);
+	} break;
+	case 0xF3: { // DI (what does this mean)
+		IME = false;
+	} break;
+	case 0xF4: {//DO NOTHING
+	} break;
+	case 0xF5: { // push AF
+		push(reg.AF);
+	} break;
+	case 0xF6: { //AND A n8
+		orByteReg(reg.A, memory.read(reg.PC));
+	} break;
+	case 0xF7: { //RST $10
+		call(0x30);
+	} break;
+	case 0xF8: {//load into reg.hl, SP + e8
+		int8_t byte = memory.read(reg.PC);
+		reg.HL = reg.SP + byte;
+	} break;
+	case 0xF9: {
+		reg.SP = reg.HL;
+	} break;
+	case 0xFA: { // load into a , [16]
+		uint16_t tempAddr = memory.readWord(reg.PC);
+		reg.A = memory.read(tempAddr);
+	} break;
+	case 0xFB: { //empty
+		IME = true;
+	} break;
+	case 0xFC: { //empty
+	} break;
+	case 0xFD: { // empty
+	} break;
+	case 0xFE: {
+		compareByteReg(reg.A, memory.read(reg.PC));
+	} break;
+	case 0xFF: {
+		call(0x38);
+	} break;
 
 	default: {
 		printf("No opcode implemented for : %d", opcode);
@@ -783,6 +1308,12 @@ void SM83::execute(uint8_t opcode)
 void SM83::reset()
 {
 	reg.PC = 0;
+	reg.SP = 0xFFFE;
+	reg.AF = 0;
+	reg.BC = 0;
+	reg.DE = 0;
+	reg.HL = 0;
+	IME = 0;
 	memory.reset();
 }
 

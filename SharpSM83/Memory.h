@@ -12,6 +12,7 @@ public:
 	uint8_t read(uint16_t& address);
 	uint8_t view(uint16_t& address);
 	uint16_t readWord(uint16_t& address);
+	void writeWord(uint16_t& address, uint16_t data);
 	void write(uint16_t address, uint8_t data);
 	void reset();
 };

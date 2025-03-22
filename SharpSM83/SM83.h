@@ -58,9 +58,13 @@ public:
 	void reset();
 	void executeCycle();
 	void execute(uint8_t opcode);
+	bool IME; // interrupt system
 
 private:
 	uint8_t cycles;
 	Memory& memory;
+	uint16_t popStack();
+	void call(uint16_t jumpAddr);
+	void push(uint16_t pushData);
 };
 #endif
