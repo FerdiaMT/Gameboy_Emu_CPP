@@ -9,6 +9,10 @@ registers reg;
 //	        76543210	
 //			znhc
 
+//things to look into
+// - on gbdev for  carry for inc/dec byte, 
+// - on gbdev for zero in addTwoReg
+
 /*
 * Z ~ Zero flag (set if result of operation is 0)
 *
@@ -74,6 +78,10 @@ std::unordered_map<uint8_t, uint8_t> opcodeCycles = {
 
 SM83::SM83(Memory& memory) : memory(memory){};
 
+void clearFlags() {
+	reg.F = 0;
+}
+
 void setZeroFlag()
 {		//     znhc
 	reg.F |= 0b10000000;
@@ -130,7 +138,8 @@ void decByte(uint8_t& r8) {
 
 void addWordReg(uint16_t& r16a, uint16_t& r16b)
 {
-	reg.F = 0;
+	clearFlags();
+
 	uint16_t r16Val = r16a + r16b;
 	if (r16a + r16b > 0xFFFF) {
 		setCarryFlag();
@@ -138,8 +147,8 @@ void addWordReg(uint16_t& r16a, uint16_t& r16b)
 	if (r16Val == 0) {
 		setZeroFlag();
 	}
-	if (((r16b & 0x0FFF) + (r16a & 0x0FFF)) > 0x0FFF) {
-		setHalfFlag;  // Set Half Carry flag (bit 5)
+	if (((r16b & 0xFFF) + (r16a & 0xFFF)) > 0xFFF) {
+		setHalfFlag();  // Set Half Carry flag (bit 5)
 	}
 	r16a = r16Val;
 }
@@ -152,9 +161,7 @@ void SM83::execute(uint8_t opcode)
 
 	}break;
 	case 0x01: { // load into bc, n16
-		//load the next word into bc
 		reg.BC = memory.readWord(reg.PC);
-		//reg.PC += 2;
 	}break;
 	case 0x02: { // write into address BC, A
 		memory.write(reg.BC, reg.A);
@@ -173,14 +180,11 @@ void SM83::execute(uint8_t opcode)
 		//reg.PC++;
 	}break;
 	case 0x07: { // rotate register A left 
-		//set carry = A leftMost?
-		reg.F = 0;
-		reg.F |= ((reg.A & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
+		reg.F = ((reg.A & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
 		reg.A = (reg.A << 1) & 0xFF;
 	}break;
 	case 0x08: { // load [a16] , SP
 		uint16_t wordAdr = memory.readWord(reg.PC);
-		//reg.PC += 2;
 		memory.write(wordAdr, (reg.SP) & 0xFF);
 		memory.write(wordAdr+1, (reg.SP>>8) & 0xFF);
 	}break;
@@ -203,9 +207,70 @@ void SM83::execute(uint8_t opcode)
 		reg.C = memory.read(reg.PC);
 	}break;
 	case 0x0F: {   //0b00000001
-		reg.F = 0; //0bznhc0000
-		reg.F |= ((reg.A & 0b1) << 4); 
+		reg.F = ((reg.A & 0b1) << 4); 
 		reg.A = (reg.A >> 1) & 0xFF;
+	}break;
+
+	//====0x1?===================================================
+
+	case 0x10: { // STOP, this is a funny one TODO: look into this in pandocs
+
+	}break;
+	case 0x11: { // load into bc, n16
+		reg.DE = memory.readWord(reg.PC);
+	}break;
+	case 0x12: { // write into address BC, A
+		memory.write(reg.DE, reg.A);
+	}break;
+	case 0x13: {
+		reg.DE++;
+	}break;
+	case 0x14: {
+		incByte(reg.D);
+	}break;
+	case 0x15: {
+		decByte(reg.D);
+	}break;
+	case 0x16: {
+		reg.D = memory.read(reg.PC);
+	}break;
+	case 0x17: { // rotate register A left ,carry goes into a
+		//0bznhc0000
+		uint8_t Cbit = (reg.F &0b00010000)>>4; // if carry is present set it otherwise dont
+
+		reg.F = ((reg.A & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
+		reg.A = ((reg.A << 1)|Cbit) & 0xFF;
+	}break;
+	case 0x18: { // jump to e8
+
+		int8_t offset = memory.read(reg.PC); // pc = 129
+		reg.PC += offset;
+
+	}break;
+	case 0x19: {
+		addWordReg(reg.HL, reg.DE);
+	}break;
+	case 0x1A: {
+		reg.A = memory.read(reg.DE);
+	}break;
+	case 0x1B: {
+		reg.DE--;
+	}break;
+	case 0x1C: {
+		incByte(reg.E);
+	}break;
+	case 0x1D: {
+		decByte(reg.E);
+	}break;
+	case 0x1E: {
+		reg.E = memory.read(reg.PC);
+	}break;
+	case 0x1F: {   //RRA //0bznhc0000
+
+		uint8_t Cbit = (reg.F & 0b00010000) << 3; 
+		reg.F = ((reg.A & 0b1) << 4);// grab most significant bit and position it at the carry flag
+		reg.A = ((reg.A >> 1) | Cbit) & 0xFF;
+
 	}break;
 
 
@@ -225,8 +290,11 @@ void SM83::reset()
 
 void SM83::executeCycle()
 {
-	uint8_t opcode = memory.read(reg.PC);
-	cycles = opcodeCycles[opcode];
+	//if (cycles > 0) {
+		uint8_t opcode = memory.read(reg.PC);
+		cycles = opcodeCycles[opcode];
 
-	execute(opcode);
+		execute(opcode);
+	//}
+	//cycles--;
 }
