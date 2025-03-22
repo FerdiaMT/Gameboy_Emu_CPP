@@ -10,6 +10,7 @@ public:
 
 	Memory();
 	uint8_t read(uint16_t& address);
+	uint8_t view(uint16_t& address);
 	uint16_t readWord(uint16_t& address);
 	void write(uint16_t address, uint8_t data);
 	void reset();
