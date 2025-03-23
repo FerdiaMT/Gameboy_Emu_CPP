@@ -37,286 +37,33 @@ registers reg;
 * 
 *  https://cturt.github.io/cinoop.html
 */
-std::unordered_map<uint8_t, uint8_t> opcodeCycles = { 
+//std::unordered_map<uint8_t, uint8_t> opcodeCycles = { };
 
-
-	//opcode , cycle (1 is 4 t cycles in docs)
-	
-	//0x
-	{0x00, 1}, // NOP
-	{0x01, 3}, // LD BC, n16
-	{0x02, 2}, // LD [BC], A
-	{0x03, 2}, // INC BC
-	{0x04, 1}, // INC B
-	{0x05, 1}, // DEC B
-	{0x06, 2}, // LD B, n8
-	{0x07, 1}, // RLCA
-	{0x08, 5}, // LD [a16], SP
-	{0x09, 2}, // ADD HL, BC
-	{0x0A, 2}, // LD A, [BC]
-	{0x0B, 2}, // DEC BC
-	{0x0C, 1}, // INC C
-	{0x0D, 1}, // DEC C
-	{0x0E, 2}, // LD C, n8
-	{0x0F, 1}, // RRCA
-
-	//1x
-	{0x10, 1}, // STOP n8
-	{0x11, 3}, // LD DE, n16
-	{0x12, 2}, // LD [DE], A
-	{0x13, 2}, // INC DE
-	{0x14, 1}, // INC D
-	{0x15, 1}, // DEC D
-	{0x16, 2}, // LD D, n8
-	{0x17, 1}, // RLA
-	{0x18, 3}, // JR, e8
-	{0x19, 2}, // ADD HL, DE
-	{0x1A, 2}, // LD A, [DE]
-	{0x1B, 2}, // DEC DE
-	{0x1C, 1}, // INC E
-	{0x1D, 1}, // DEC E
-	{0x1E, 2}, // LD E, n8
-	{0x1F, 1}, // RRA
-
-	{0x20, 1}, //start clock cycle here
-	{0x21, 3}, 
-	{0x22, 2}, 
-	{0x23, 2}, 
-	{0x24, 1}, 
-	{0x25, 1}, 
-	{0x26, 2}, 
-	{0x27, 1}, 
-	{0x28, 3}, 
-	{0x29, 2}, 
-	{0x2A, 2}, 
-	{0x2B, 2}, 
-	{0x2C, 1}, 
-	{0x2D, 1}, 
-	{0x2E, 2}, 
-	{0x2F, 1}, 
-
-	{0x30, 1},
-	{0x31, 3},
-	{0x32, 2},
-	{0x33, 2},
-	{0x34, 1},
-	{0x35, 1},
-	{0x36, 2},
-	{0x37, 1},
-	{0x38, 3},
-	{0x39, 2},
-	{0x3A, 2},
-	{0x3B, 2},
-	{0x3C, 1},
-	{0x3D, 1},
-	{0x3E, 2},
-	{0x3F, 1},
-
-	{0x40, 1},
-	{0x41, 3},
-	{0x42, 2},
-	{0x43, 2},
-	{0x44, 1},
-	{0x45, 1},
-	{0x46, 2},
-	{0x47, 1},
-	{0x48, 3},
-	{0x49, 2},
-	{0x4A, 2},
-	{0x4B, 2},
-	{0x4C, 1},
-	{0x4D, 1},
-	{0x4E, 2},
-	{0x4F, 1},
-
-	{0x50, 1},
-	{0x51, 3},
-	{0x52, 2},
-	{0x53, 2},
-	{0x54, 1},
-	{0x55, 1},
-	{0x56, 2},
-	{0x57, 1},
-	{0x58, 3},
-	{0x59, 2},
-	{0x5A, 2},
-	{0x5B, 2},
-	{0x5C, 1},
-	{0x5D, 1},
-	{0x5E, 2},
-	{0x5F, 1},
-
-	{ 0x60, 1 },
-	{ 0x61, 3 },
-	{ 0x62, 2 },
-	{ 0x63, 2 },
-	{ 0x64, 1 },
-	{ 0x65, 1 },
-	{ 0x66, 2 },
-	{ 0x67, 1 },
-	{ 0x68, 3 },
-	{ 0x69, 2 },
-	{ 0x6A, 2 },
-	{ 0x6B, 2 },
-	{ 0x6C, 1 },
-	{ 0x6D, 1 },
-	{ 0x6E, 2 },
-	{ 0x6F, 1 },
-
-	{ 0x70, 1 },
-	{ 0x71, 3 },
-	{ 0x72, 2 },
-	{ 0x73, 2 },
-	{ 0x74, 1 },
-	{ 0x75, 1 },
-	{ 0x76, 2 },
-	{ 0x77, 1 },
-	{ 0x78, 3 },
-	{ 0x79, 2 },
-	{ 0x7A, 2 },
-	{ 0x7B, 2 },
-	{ 0x7C, 1 },
-	{ 0x7D, 1 },
-	{ 0x7E, 2 },
-	{ 0x7F, 1 },
-
-	{ 0x80, 1 },
-	{ 0x81, 3 },
-	{ 0x82, 2 },
-	{ 0x83, 2 },
-	{ 0x84, 1 },
-	{ 0x85, 1 },
-	{ 0x86, 2 },
-	{ 0x87, 1 },
-	{ 0x88, 3 },
-	{ 0x89, 2 },
-	{ 0x8A, 2 },
-	{ 0x8B, 2 },
-	{ 0x8C, 1 },
-	{ 0x8D, 1 },
-	{ 0x8E, 2 },
-	{ 0x8F, 1 },
-
-	{ 0x90, 1 },
-	{ 0x91, 3 },
-	{ 0x92, 2 },
-	{ 0x93, 2 },
-	{ 0x94, 1 },
-	{ 0x95, 1 },
-	{ 0x96, 2 },
-	{ 0x97, 1 },
-	{ 0x98, 3 },
-	{ 0x99, 2 },
-	{ 0x9A, 2 },
-	{ 0x9B, 2 },
-	{ 0x9C, 1 },
-	{ 0x9D, 1 },
-	{ 0x9E, 2 },
-	{ 0x9F, 1 },
-
-	{ 0xA0, 1 },
-	{ 0xA1, 3 },
-	{ 0xA2, 2 },
-	{ 0xA3, 2 },
-	{ 0xA4, 1 },
-	{ 0xA5, 1 },
-	{ 0xA6, 2 },
-	{ 0xA7, 1 },
-	{ 0xA8, 3 },
-	{ 0xA9, 2 },
-	{ 0xAA, 2 },
-	{ 0xAB, 2 },
-	{ 0xAC, 1 },
-	{ 0xAD, 1 },
-	{ 0xAE, 2 },
-	{ 0xAF, 1 },
-
-	{ 0xB0, 1 },
-	{ 0xB1, 3 },
-	{ 0xB2, 2 },
-	{ 0xB3, 2 },
-	{ 0xB4, 1 },
-	{ 0xB5, 1 },
-	{ 0xB6, 2 },
-	{ 0xB7, 1 },
-	{ 0xB8, 3 },
-	{ 0xB9, 2 },
-	{ 0xBA, 2 },
-	{ 0xBB, 2 },
-	{ 0xBC, 1 },
-	{ 0xBD, 1 },
-	{ 0xBE, 2 },
-	{ 0xBF, 1 },
-
-	{ 0xC0, 1 },
-	{ 0xC1, 3 },
-	{ 0xC2, 2 },
-	{ 0xC3, 2 },
-	{ 0xC4, 1 },
-	{ 0xC5, 1 },
-	{ 0xC6, 2 },
-	{ 0xC7, 1 },
-	{ 0xC8, 3 },
-	{ 0xC9, 2 },
-	{ 0xCA, 2 },
-	{ 0xCB, 2 },
-	{ 0xCC, 1 },
-	{ 0xCD, 1 },
-	{ 0xCE, 2 },
-	{ 0xCF, 1 },
-
-	{ 0xD0, 1 },
-	{ 0xD1, 3 },
-	{ 0xD2, 2 },
-	{ 0xD3, 2 },
-	{ 0xD4, 1 },
-	{ 0xD5, 1 },
-	{ 0xD6, 2 },
-	{ 0xD7, 1 },
-	{ 0xD8, 3 },
-	{ 0xD9, 2 },
-	{ 0xDA, 2 },
-	{ 0xDB, 2 },
-	{ 0xDC, 1 },
-	{ 0xDD, 1 },
-	{ 0xDE, 2 },
-	{ 0xDF, 1 },
-
-	{ 0xE0, 1 },
-	{ 0xE1, 3 },
-	{ 0xE2, 2 },
-	{ 0xE3, 2 },
-	{ 0xE4, 1 },
-	{ 0xE5, 1 },
-	{ 0xE6, 2 },
-	{ 0xE7, 1 },
-	{ 0xE8, 3 },
-	{ 0xE9, 2 },
-	{ 0xEA, 2 },
-	{ 0xEB, 2 },
-	{ 0xEC, 1 },
-	{ 0xED, 1 },
-	{ 0xEE, 2 },
-	{ 0xEF, 1 },
-
-	{ 0xF0, 1 },
-	{ 0xF1, 3 },
-	{ 0xF2, 2 },
-	{ 0xF3, 2 },
-	{ 0xF4, 1 },
-	{ 0xF5, 1 },
-	{ 0xF6, 2 },
-	{ 0xF7, 1 },
-	{ 0xF8, 3 },
-	{ 0xF9, 2 },
-	{ 0xFA, 2 },
-	{ 0xFB, 2 },
-	{ 0xFC, 1 },
-	{ 0xFD, 1 },
-	{ 0xFE, 2 },
-	{ 0xFF, 1 },
-
-};
+uint8_t opcodeCycles[0xFF]
+{
+/////////////////////////////////////////////////////////////
+// //  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F  //  //
+/////////////////////////////////////////////////////////////
+/*0*/												    /*0*/
+/*1*/												    /*1*/
+/*2*/												    /*2*/
+/*3*/												    /*3*/
+/*4*/												    /*4*/
+/*5*/												    /*5*/
+/*6*/												    /*6*/
+/*7*/												    /*7*/
+/*8*/												    /*8*/
+/*9*/												    /*9*/
+/*A*/												    /*A*/
+/*B*/												    /*B*/
+/*C*/												    /*C*/
+/*D*/												    /*D*/
+/*E*/												    /*E*/
+/*F*/												    /*F*/
+/////////////////////////////////////////////////////////////
+// //  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F  //  //
+/////////////////////////////////////////////////////////////
+}
 
 SM83::SM83(Memory& memory) : memory(memory){};
 
@@ -343,7 +90,7 @@ void setCarryFlag()
 
 bool isZeroFlag()
 {
-	return (reg.F >> 7)&0b1;
+	return (reg.F >> 7) & 0b1;
 }
 bool isNegFlag()
 {
@@ -361,7 +108,7 @@ bool isCarryFlag()
 
 void incByte(uint8_t& r8) //INC r8
 {
-	reg.F = 0b00000000;
+	clearFlags();
 
 	if (r8 == 0xFF) // if overflows
 	{   //		   znhc
@@ -494,8 +241,10 @@ void subByteReg(uint8_t& r8a , uint8_t r8b)
 
 void subCarryByteReg(uint8_t& r8a, uint8_t r8b)
 {
-	uint8_t isCarry = 0;
-	if (isCarryFlag()) isCarry = 1;
+	/*uint8_t isCarry = 0;
+	if (isCarryFlag()) isCarry = 1;*/
+
+	uint8_t isCarry = isCarryFlag();
 
 	clearFlags();
 	setNegFlag();
@@ -570,7 +319,7 @@ void SM83::call(uint16_t jumpAddr)
 }
 void SM83::push(uint16_t pushData)
 {
-	reg.SP--;
+	reg.SP-=2;
 	memory.writeWord(reg.SP, pushData);
 }
 
@@ -824,7 +573,7 @@ void SM83::execute(uint8_t opcode)
 		uint8_t byte = memory.view(reg.HL); // this one wont increment
 		incByte(byte);
 		memory.write(reg.HL, byte);
-		//UNSURE IF I SHOULD INCREMENT PROGRAMCOUNTER FROM HERE 
+		//UNSURE IF I SHOULD INCREMENT PROGRAM COUNTER FROM HERE 
 	}break;
 	case 0x35: {
 		uint8_t byte = memory.view(reg.HL); // this one wont increment
@@ -1051,7 +800,15 @@ void SM83::execute(uint8_t opcode)
 		memory.write(reg.HL, reg.L);
 	} break;
 	case 0x76: {// HALT
-		
+		//DO STUFF HERE (IME MODE)
+		if (IME)
+		{
+
+		}
+		else 
+		{
+
+		}
 	} break;
 	case 0x77: {
 		memory.write(reg.HL, reg.A);
