@@ -67,8 +67,8 @@ private:
 	uint16_t popStack();
 	void call(uint16_t jumpAddr);
 	void push(uint16_t pushData);
-	void addCycle();
-	void addCycle(uint8_t cyclesAdded);
+	inline void addCycle();
+	inline void addCycle(uint8_t cyclesAdded);
 
 };
 #endif

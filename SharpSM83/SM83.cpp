@@ -77,69 +77,69 @@ uint8_t opcodeCycles[0x100]
 
 SM83::SM83(Memory& memory) : memory(memory){};
 
-void clearFlags() {
+inline void clearFlags() { //inline is replace the code directly during compile
 	reg.F = 0;
 }
 
-void setZeroFlag()
+inline void setZeroFlag()
 {		//     znhc
 	reg.F |= 0b10000000;
 }
-void unsetZeroFlag()
+inline void unsetZeroFlag()
 {
 	reg.F &= 0b01111111;
 }
 
-void setNegFlag()
+inline void setNegFlag()
 {		//     znhc
 	reg.F |= 0b01000000;
 }
-void unsetNegFlag()
+inline void unsetNegFlag()
 {
 	reg.F &= 0b10111111; 
 }
 
-void setHalfFlag()
+inline void setHalfFlag()
 {		//     znhc
 	reg.F |= 0b00100000;
 }
-void unsetHalfFlag()
+inline void unsetHalfFlag()
 {		//     znhc
 	reg.F &= 0b11011111;
 }
 
-void setCarryFlag()
+inline void setCarryFlag()
 {		//     znhc
 	reg.F |= 0b00010000;
 }
-void unsetCarryFlag()
+inline void unsetCarryFlag()
 {		//     znhc
 	reg.F &= 0b11101111;
 }
 
-bool isZeroFlag()
+inline bool isZeroFlag()
 {
 	return (reg.F >> 7) & 0b1;
 }
-bool isNegFlag()
+inline bool isNegFlag()
 {
 	return (reg.F >> 6) & 0b1;
 }
-bool isHalfFlag()
+inline bool isHalfFlag()
 {
 	return (reg.F >> 5) & 0b1;
 }
-bool isCarryFlag()
+inline bool isCarryFlag()
 {
 	return (reg.F >> 4) & 0b1;
 }
 
-void SM83::addCycle()
+inline void SM83::addCycle()
 {
 	cycles++;
 }
 
-void SM83::addCycle(uint8_t cyclesAdded)
+inline void SM83::addCycle(uint8_t cyclesAdded)
 {
 	cycles+=cyclesAdded;
 }
@@ -147,39 +147,18 @@ void SM83::addCycle(uint8_t cyclesAdded)
 
 void incByte(uint8_t& r8) //INC r8
 {
-	clearFlags();
-
-	if (r8 == 0xFF) // if overflows
-	{   //		   znhc
-		reg.F |= 0b10010000; // carry / zero flag (only way to get to 0 is through overflow)
-	}
-
-	if ((r8 & 0x0F) == 0x0F) { // half carry
-		reg.F |= 0b00100000; 
-	}
-
+	unsetNegFlag();
+	if ((r8 & 0x0F) == 0x0F) setHalfFlag();
 	r8++;
+	if (r8 == 0) setZeroFlag(); 
 }
 
-void decByte(uint8_t& r8) {
-
-	if (r8 == 0x01) 
-	{   //		  znhc
-		reg.F = 0b11000000;
-	}
-	else if (r8 == 0x00)
-	{//		      znhc
-		reg.F = 0b01010000;
-	}
-	else if ((r8 & 0x0F) == 0x00) //half carry
-	{ //		  znhc
-		reg.F = 0b01100000;
-	}
-	else {
-		reg.F = 0b01000000;
-	}
-
+void decByte(uint8_t& r8) 
+{
+	setNegFlag();
+	if ((r8 & 0x0F) == 0) setHalfFlag();
 	r8--;
+	if (r8 == 0) setZeroFlag(); 
 }
 
 void addWordReg(uint16_t& r16a, uint16_t r16b)
@@ -219,88 +198,51 @@ void addWordRegSigned(uint16_t& r16a, int8_t r8b)
 void addByteReg(uint8_t& r8a , uint8_t r8b)
 {
 	clearFlags();
-	uint8_t r8Val = r8a + r8b;
-	if (r8a + r8b > 0xFF)
-	{
-		setCarryFlag();
-	}
-	if (r8Val == 0)
-	{
-		setZeroFlag();
-	}
-	if (((r8b & 0x0F) + (r8a & 0x0F)) > 0x0F) {
-		setHalfFlag();  // Look into this(Shoudl be working)
-	}
+	uint16_t r16= r8a + r8b;
 
-	r8a = r8Val;
+	if (r16 & 0xFF00) setCarryFlag();
+	if ((r8a & 0x0F) + (r8b & 0x0F) > 0x0F) setHalfFlag();
+	if ((uint8_t)r16 == 0) setZeroFlag();
+
+	r8a = (uint8_t)r16;
 }
 
 void addCarryByteReg(uint8_t& r8a, uint8_t r8b)
 {
-	uint8_t isCarry = 0;
-	if (isCarryFlag()) isCarry = 1;
+	uint8_t carry = isCarryFlag() ? 1 : 0;
+    clearFlags();
+    uint16_t r16 = r8a + r8b + carry;
 
-	clearFlags();
-	uint8_t r8Val = r8a + r8b + isCarry;
+    if (r16 & 0xFF00) setCarryFlag(); 
+    if ((r8a & 0x0F) + (r8b & 0x0F) + carry > 0x0F) setHalfFlag();  
+    if ((uint8_t)r16 == 0) setZeroFlag(); 
 
-	if (r8a + r8b+ isCarry > 0xFF)
-	{
-		setCarryFlag();
-	}
-	if (r8Val == 0)
-	{
-		setZeroFlag();
-	}
-	if (((r8b & 0x0F) + (r8a & 0x0F))+ isCarry > 0x0F) {
-		setHalfFlag();  // Look into this(Shoudl be working)
-	}
-
-	r8a = r8Val;
+    r8a = (uint8_t)r16;
 }
 
 void subByteReg(uint8_t& r8a , uint8_t r8b)
 {
 	clearFlags();
-	setNegFlag();
-	uint8_t r8Val = r8a - r8b;
-	if (r8b > r8a)
-	{
-		setCarryFlag();
-	}
-	if (r8Val == 0)
-	{
-		setZeroFlag();
-	}
-	if ((r8a & 0x0F) < (r8b & 0x0F)) {
-		setHalfFlag();
-	}
-
-	r8a = r8Val;
+	setNegFlag(); 
+	if (r8b > r8a) setCarryFlag(); 
+	if ((r8a & 0x0F) < (r8b & 0x0F)) setHalfFlag();
+	r8a -= r8b;
+	if (r8a == 0) setZeroFlag(); 
 }
 
 void subCarryByteReg(uint8_t& r8a, uint8_t r8b)
 {
-	/*uint8_t isCarry = 0;
-	if (isCarryFlag()) isCarry = 1;*/
-
-	uint8_t isCarry = isCarryFlag();
-
+	uint8_t carry = isCarryFlag() ? 1 : 0;
 	clearFlags();
 	setNegFlag();
-	uint8_t r8Val = r8a - r8b - isCarry;
-	if (r8b+isCarry > r8a)
-	{
-		setCarryFlag();
-	}
-	if (r8Val == 0)
-	{
-		setZeroFlag();
-	}
-	if (((r8a & 0x0F) + isCarry) > (r8b & 0x0F)) {
-		setHalfFlag();
-	}
 
-	r8a = r8Val;
+	uint16_t r16 = r8a - r8b - carry;
+
+	if (r8b + carry > r8a) setCarryFlag();
+	if ((r8a & 0x0F) < (r8b & 0x0F) + carry) setHalfFlag();
+	if ((uint8_t)r16 == 0) setZeroFlag();
+
+	r8a = (uint8_t)r16;
 }
 
 void andByteReg(uint8_t& r8a, uint8_t r8b)
@@ -451,12 +393,12 @@ void bit(uint8_t u3, uint8_t r8)
 		setZeroFlag();
 	}
 }
-void res(uint8_t u3, uint8_t& r8)
+inline void res(uint8_t u3, uint8_t& r8)
 {
 	r8 &= ~(1 << u3);
 }
 
-void set(uint8_t u3, uint8_t r8)
+inline void set(uint8_t u3, uint8_t& r8)
 {
 	r8 |= (1 << u3);
 }
@@ -1493,7 +1435,7 @@ void SM83::execute(uint8_t opcode)
 	case 0x20: { // JR NZ , e8
 		// jump to e8 if NotZ is met
 		int8_t offset = memory.read(reg.PC); // pc = 129
-		if (!isZeroFlag)
+		if (!isZeroFlag())
 		{
 			addCycle();
 			reg.PC += offset;
@@ -2364,8 +2306,6 @@ void SM83::execute(uint8_t opcode)
 	}break;
 	}
 }
-
-
 
 void SM83::reset()
 {
