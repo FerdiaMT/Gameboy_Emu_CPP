@@ -85,17 +85,36 @@ void setZeroFlag()
 {		//     znhc
 	reg.F |= 0b10000000;
 }
+void unsetZeroFlag()
+{
+	reg.F &= 0b01111111;
+}
+
 void setNegFlag()
 {		//     znhc
 	reg.F |= 0b01000000;
 }
+void unsetNegFlag()
+{
+	reg.F &= 0b10111111; 
+}
+
 void setHalfFlag()
 {		//     znhc
 	reg.F |= 0b00100000;
 }
+void unsetHalfFlag()
+{		//     znhc
+	reg.F &= 0b11011111;
+}
+
 void setCarryFlag()
 {		//     znhc
 	reg.F |= 0b00010000;
+}
+void unsetCarryFlag()
+{		//     znhc
+	reg.F &= 0b11101111;
 }
 
 bool isZeroFlag()
@@ -324,6 +343,10 @@ void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
 	}
 }
 
+
+
+
+
 uint16_t SM83::popStack()
 {
 	uint16_t word  = memory.readWord(reg.SP);
@@ -343,6 +366,1016 @@ void SM83::push(uint16_t pushData)
 	memory.writeWord(reg.SP, pushData);
 }
 
+
+void rlc(uint8_t& r8) // rotate left, r8  just bitshifted no other change
+{
+	clearFlags();
+	reg.F = ((r8 & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
+	r8 = (r8 << 1) & 0xFF;
+	if (r8 == 0) setZeroFlag();
+}
+
+void rl(uint8_t& r8) // rotate left, r8 dig 1 = prev carry flag
+{
+	uint8_t Cbit = (reg.F & 0b00010000) >> 4; // if carry is present set it otherwise dont
+	clearFlags();
+	reg.F = ((r8 & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
+	r8 = ((r8 << 1) | Cbit) & 0xFF;
+	if (r8 == 0) setZeroFlag();
+}
+
+void rrc(uint8_t& r8)
+{
+	clearFlags();
+	reg.F = ((r8 & 0b1) << 4);
+	r8 = (r8 >> 1) & 0xFF;
+	if (r8 == 0) setZeroFlag();
+}
+
+void rr(uint8_t& r8)
+{
+	uint8_t Cbit = (reg.F & 0b00010000) << 3;
+	clearFlags();
+	reg.F = ((r8 & 0b1) << 4);// grab most significant bit and position it at the carry flag
+	r8 = ((r8 >> 1) | Cbit) & 0xFF;
+	if (r8 == 0) setZeroFlag();
+}
+
+void sla(uint8_t& r8)
+{
+	clearFlags();
+	if ((r8 & 0b10000000) >> 7) setCarryFlag();
+	r8 = (r8 << 1)  & 0b11111110; //force last val into 0
+	if (r8 == 0) setZeroFlag();
+}
+
+void sra(uint8_t& r8)
+{
+	clearFlags();
+	if (r8 & 0b00000001) setCarryFlag();
+	r8 = (r8 >> 1) & (r8 & 0b10000000) & 0xFF;
+	if (r8 == 0) setZeroFlag();
+}
+
+void swap(uint8_t& r8) 
+{
+	clearFlags();
+	r8 = ((r8 >> 4) & 0x0F) | ((r8 & 0x0F) << 4);
+	if (r8 == 0) setZeroFlag();
+}
+
+void srl(uint8_t& r8)
+{
+	clearFlags();
+	if (r8 & 0b00000001) setCarryFlag();
+	r8 = (r8 >> 1) & 0b01111111;
+	if (r8 == 0) setZeroFlag();
+}
+
+void bit(uint8_t u3, uint8_t r8)
+{
+	unsetNegFlag();
+	setHalfFlag();
+	
+	//r8 (9) 0b00001001
+	//u3 (3) 0b00000011
+	// in this case 1<<u3 would work to trigger that bit
+	//r8 (9) 0b00001001 &
+	//1 << 3 0b00001000 -> returns true here
+	if (r8 & (1 << u3)) // if u3 bit is set
+	{
+		unsetZeroFlag();
+	}
+	else
+	{
+		setZeroFlag();
+	}
+}
+void res(uint8_t u3, uint8_t& r8)
+{
+	r8 &= ~(1 << u3);
+}
+
+void set(uint8_t u3, uint8_t r8)
+{
+	r8 |= (1 << u3);
+}
+
+void SM83::executePrefix(uint8_t opcode)
+{
+	switch (opcode) {
+
+	case 0x00: {
+		rlc(reg.B);
+	} break;
+	case 0x01: {
+		rlc(reg.C);
+	} break;
+	case 0x02: {
+		rlc(reg.D);
+	} break;
+	case 0x03: {
+		rlc(reg.E);
+	} break;
+	case 0x04: {
+		rlc(reg.H);
+	} break;
+	case 0x05: {
+		rlc(reg.L);
+	} break;
+	case 0x06: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		rlc(a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x07: {
+		rlc(reg.A);
+	} break;
+	case 0x08: {
+		rrc(reg.B);
+	} break;
+	case 0x09: {
+		rrc(reg.C);
+	} break;
+	case 0x0A: {
+		rrc(reg.D);
+	} break;
+	case 0x0B: {
+		rrc(reg.E);
+	} break;
+	case 0x0C: {
+		rrc(reg.H);
+	} break;
+	case 0x0D: {
+		rrc(reg.L);
+	} break;
+	case 0x0E: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		rrc(a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x0F: {
+		rrc(reg.A);
+	} break;
+	//line 1 ===RL RR================================================
+	case 0x10: {
+		rl(reg.B);
+	} break;
+	case 0x11: {
+		rl(reg.C);
+	} break;
+	case 0x12: {
+		rl(reg.D);
+	} break;
+	case 0x13: {
+		rl(reg.E);
+	} break;
+	case 0x14: {
+		rl(reg.H);
+	} break;
+	case 0x15: {
+		rl(reg.L);
+	} break;
+	case 0x16: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		rl(a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x17: {
+		rl(reg.A);
+	} break;
+	case 0x18: {
+		rr(reg.B);
+	} break;
+	case 0x19: {
+		rr(reg.C);
+	} break;
+	case 0x1A: {
+		rr(reg.D);
+	} break;
+	case 0x1B: {
+		rr(reg.E);
+	} break;
+	case 0x1C: {
+		rr(reg.H);
+	} break;
+	case 0x1D: {
+		rr(reg.L);
+	} break;
+	case 0x1E: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		rr(a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x1F: {
+		rr(reg.A);
+	} break;
+//line 2 ===SLA SRA================================================
+	
+	case 0x20: {
+		sla(reg.B);
+	} break;
+	case 0x21: {
+		sla(reg.C);
+	} break;
+	case 0x22: {
+		sla(reg.D);
+	} break;
+	case 0x23: {
+		sla(reg.E);
+	} break;
+	case 0x24: {
+		sla(reg.H);
+	} break;
+	case 0x25: {
+		sla(reg.L);
+	} break;
+	case 0x26: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		sla(a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x27: {
+		sla(reg.A);
+	} break;
+	case 0x28: {
+		sra(reg.B);
+	} break;
+	case 0x29: {
+		sra(reg.C);
+	} break;
+	case 0x2A: {
+		sra(reg.D);
+	} break;
+	case 0x2B: {
+		sra(reg.E);
+	} break;
+	case 0x2C: {
+		sra(reg.H);
+	} break;
+	case 0x2D: {
+		sra(reg.L);
+	} break;
+	case 0x2E: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		sra(a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x2F: {
+		sra(reg.A);
+	} break;
+//line 3 ===SWAP SRL================================================
+
+	case 0x30: {
+		swap(reg.B);
+	} break;
+	case 0x31: {
+		swap(reg.C);
+	} break;
+	case 0x32: {
+		swap(reg.D);
+	} break;
+	case 0x33: {
+		swap(reg.E);
+	} break;
+	case 0x34: {
+		swap(reg.H);
+	} break;
+	case 0x35: {
+		swap(reg.L);
+	} break;
+	case 0x36: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		swap(a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x37: {
+		swap(reg.A);
+	} break;
+	case 0x38: {
+		srl(reg.B);
+	} break;
+	case 0x39: {
+		srl(reg.C);
+	} break;
+	case 0x3A: {
+		srl(reg.D);
+	} break;
+	case 0x3B: {
+		srl(reg.E);
+	} break;
+	case 0x3C: {
+		srl(reg.H);
+	} break;
+	case 0x3D: {
+		srl(reg.L);
+	} break;
+	case 0x3E: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		srl(a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x3F: {
+		srl(reg.A);
+	} break;
+//	line 4 bit (0x6, 0xe should be 1 not 2) =======================
+	
+	case 0x40: {
+		bit(0,reg.B);
+	} break;
+	case 0x41: {
+		bit(0, reg.C);
+	} break;
+	case 0x42: {
+		bit(0, reg.D);
+	} break;
+	case 0x43: {
+		bit(0, reg.E);
+	} break;
+	case 0x44: {
+		bit(0, reg.H);
+	} break;
+	case 0x45: {
+		bit(0, reg.L);
+	} break;
+	case 0x46: {// whatever hl is pointing to
+		addCycle();
+		uint8_t a8 = memory.view(reg.HL);
+		bit(0, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x47: {
+		bit(0, reg.A);
+	} break;
+	case 0x48: {
+		bit(1, reg.B);
+	} break;
+	case 0x49: {
+		bit(1, reg.C);
+	} break;
+	case 0x4A: {
+		bit(1, reg.D);
+	} break;
+	case 0x4B: {
+		bit(1, reg.E);
+	} break;
+	case 0x4C: {
+		bit(1, reg.H);
+	} break;
+	case 0x4D: {
+		bit(1, reg.L);
+	} break;
+	case 0x4E: {// whatever hl is pointing to
+		addCycle();
+		uint8_t a8 = memory.view(reg.HL);
+		bit(1, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x4F: {
+		bit(1, reg.A);
+	} break;
+//	line 5 bit (0x6, 0xe should be 1 not 2) =======================
+
+	case 0x50: {
+		bit(2, reg.B);
+	} break;
+	case 0x51: {
+		bit(2, reg.C);
+	} break;
+	case 0x52: {
+		bit(2, reg.D);
+	} break;
+	case 0x53: {
+		bit(2, reg.E);
+	} break;
+	case 0x54: {
+		bit(2, reg.H);
+	} break;
+	case 0x55: {
+		bit(2, reg.L);
+	} break;
+	case 0x56: {// whatever hl is pointing to
+		addCycle();
+		uint8_t a8 = memory.view(reg.HL);
+		bit(2, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x57: {
+		bit(2, reg.A);
+	} break;
+	case 0x58: {
+		bit(3, reg.B);
+	} break;
+	case 0x59: {
+		bit(3, reg.C);
+	} break;
+	case 0x5A: {
+		bit(3, reg.D);
+	} break;
+	case 0x5B: {
+		bit(3, reg.E);
+	} break;
+	case 0x5C: {
+		bit(3, reg.H);
+	} break;
+	case 0x5D: {
+		bit(3, reg.L);
+	} break;
+	case 0x5E: {// whatever hl is pointing to
+		addCycle();
+		uint8_t a8 = memory.view(reg.HL);
+		bit(3, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x5F: {
+		bit(3, reg.A);
+	} break;
+
+//	line 6 bit (0x6, 0xe should be 1 not 2) =======================
+
+	case 0x60: {
+		bit(4, reg.B);
+	} break;
+	case 0x61: {
+		bit(4, reg.C);
+	} break;
+	case 0x62: {
+		bit(4, reg.D);
+	} break;
+	case 0x63: {
+		bit(4, reg.E);
+	} break;
+	case 0x64: {
+		bit(4, reg.H);
+	} break;
+	case 0x65: {
+		bit(4, reg.L);
+	} break;
+	case 0x66: {// whatever hl is pointing to
+		addCycle();
+		uint8_t a8 = memory.view(reg.HL);
+		bit(4, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x67: {
+		bit(4, reg.A);
+	} break;
+	case 0x68: {
+		bit(5, reg.B);
+	} break;
+	case 0x69: {
+		bit(5, reg.C);
+	} break;
+	case 0x6A: {
+		bit(5, reg.D);
+	} break;
+	case 0x6B: {
+		bit(5, reg.E);
+	} break;
+	case 0x6C: {
+		bit(5, reg.H);
+	} break;
+	case 0x6D: {
+		bit(5, reg.L);
+	} break;
+	case 0x6E: {// whatever hl is pointing to
+		addCycle();
+		uint8_t a8 = memory.view(reg.HL);
+		bit(5, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x6F: {
+		bit(5, reg.A);
+	} break;
+
+//	line 7 bit (0x6, 0xe should be 1 not 2) =======================
+
+	case 0x70: {
+		bit(6, reg.B);
+	} break;
+	case 0x71: {
+		bit(6, reg.C);
+	} break;
+	case 0x72: {
+		bit(6, reg.D);
+	} break;
+	case 0x73: {
+		bit(6, reg.E);
+	} break;
+	case 0x74: {
+		bit(6, reg.H);
+	} break;
+	case 0x75: {
+		bit(6, reg.L);
+	} break;
+	case 0x76: {// whatever hl is pointing to
+		addCycle();
+		uint8_t a8 = memory.view(reg.HL);
+		bit(6, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x77: {
+		bit(6, reg.A);
+	} break;
+	case 0x78: {
+		bit(7, reg.B);
+	} break;
+	case 0x79: {
+		bit(7, reg.C);
+	} break;
+	case 0x7A: {
+		bit(7, reg.D);
+	} break;
+	case 0x7B: {
+		bit(7, reg.E);
+	} break;
+	case 0x7C: {
+		bit(7, reg.H);
+	} break;
+	case 0x7D: {
+		bit(7, reg.L);
+	} break;
+	case 0x7E: {// whatever hl is pointing to
+		addCycle();
+		uint8_t a8 = memory.view(reg.HL);
+		bit(7, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x7F: {
+		bit(7, reg.A);
+	} break;
+
+//	line 8 bit (0x6, 0xe should be 2 not 1) =======================
+
+	case 0x80: {
+		res(0, reg.B);
+	} break;
+	case 0x81: {
+		res(0, reg.C);
+	} break;
+	case 0x82: {
+		res(0, reg.D);
+	} break;
+	case 0x83: {
+		res(0, reg.E);
+	} break;
+	case 0x84: {
+		res(0, reg.H);
+	} break;
+	case 0x85: {
+		res(0, reg.L);
+	} break;
+	case 0x86: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		res(0, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x87: {
+		res(0, reg.A);
+	} break;
+	case 0x88: {
+		res(1, reg.B);
+	} break;
+	case 0x89: {
+		res(1, reg.C);
+	} break;
+	case 0x8A: {
+		res(1, reg.D);
+	} break;
+	case 0x8B: {
+		res(1, reg.E);
+	} break;
+	case 0x8C: {
+		res(1, reg.H);
+	} break;
+	case 0x8D: {
+		res(1, reg.L);
+	} break;
+	case 0x8E: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		res(1, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x8F: {
+		res(1, reg.A);
+	} break;
+
+//	line 9 bit (0x6, 0xe should be 2 not 1) =======================
+
+	case 0x90: {
+		res(2, reg.B);
+	} break;
+	case 0x91: {
+		res(2, reg.C);
+	} break;
+	case 0x92: {
+		res(2, reg.D);
+	} break;
+	case 0x93: {
+		res(2, reg.E);
+	} break;
+	case 0x94: {
+		res(2, reg.H);
+	} break;
+	case 0x95: {
+		res(2, reg.L);
+	} break;
+	case 0x96: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		res(0, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x97: {
+		res(2, reg.A);
+	} break;
+	case 0x98: {
+		res(3, reg.B);
+	} break;
+	case 0x99: {
+		res(3, reg.C);
+	} break;
+	case 0x9A: {
+		res(3, reg.D);
+	} break;
+	case 0x9B: {
+		res(3, reg.E);
+	} break;
+	case 0x9C: {
+		res(3, reg.H);
+	} break;
+	case 0x9D: {
+		res(3, reg.L);
+	} break;
+	case 0x9E: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		res(3, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0x9F: {
+		res(3, reg.A);
+	} break;
+//	line A bit (0x6, 0xe should be 2 not 1) =======================
+
+	case 0xA0: {
+		res(4, reg.B);
+	} break;
+	case 0xA1: {
+		res(4, reg.C);
+	} break;
+	case 0xA2: {
+		res(4, reg.D);
+	} break;
+	case 0xA3: {
+		res(4, reg.E);
+	} break;
+	case 0xA4: {
+		res(4, reg.H);
+	} break;
+	case 0xA5: {
+		res(4, reg.L);
+	} break;
+	case 0xA6: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		res(4, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xA7: {
+		res(4, reg.A);
+	} break;
+	case 0xA8: {
+		res(5, reg.B);
+	} break;
+	case 0xA9: {
+		res(5, reg.C);
+	} break;
+	case 0xAA: {
+		res(5, reg.D);
+	} break;
+	case 0xAB: {
+		res(5, reg.E);
+	} break;
+	case 0xAC: {
+		res(5, reg.H);
+	} break;
+	case 0xAD: {
+		res(5, reg.L);
+	} break;
+	case 0xAE: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		res(5, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xAF: {
+		res(5, reg.A);
+	} break;
+
+//	line b bit (0x6, 0xe should be 2 not 1) =======================
+
+	case 0xB0: {
+		res(6, reg.B);
+	} break;
+	case 0xB1: {
+		res(6, reg.C);
+	} break;
+	case 0xB2: {
+		res(6, reg.D);
+	} break;
+	case 0xB3: {
+		res(6, reg.E);
+	} break;
+	case 0xB4: {
+		res(6, reg.H);
+	} break;
+	case 0xB5: {
+		res(6, reg.L);
+	} break;
+	case 0xB6: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		res(6, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xB7: {
+		res(6, reg.A);
+	} break;
+	case 0xB8: {
+		res(7, reg.B);
+	} break;
+	case 0xB9: {
+		res(7, reg.C);
+	} break;
+	case 0xBA: {
+		res(7, reg.D);
+	} break;
+	case 0xBB: {
+		res(7, reg.E);
+	} break;
+	case 0xBC: {
+		res(7, reg.H);
+	} break;
+	case 0xBD: {
+		res(7, reg.L);
+	} break;
+	case 0xBE: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		res(7, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xBF: {
+		res(7, reg.A);
+	} break;
+
+//	line c bit (0x6, 0xe should be 2 not 1) =======================
+
+	case 0xC0: {
+		set(0, reg.B);
+	} break;
+	case 0xC1: {
+		set(0, reg.C);
+	} break;
+	case 0xC2: {
+		set(0, reg.D);
+	} break;
+	case 0xC3: {
+		set(0, reg.E);
+	} break;
+	case 0xC4: {
+		set(0, reg.H);
+	} break;
+	case 0xC5: {
+		set(0, reg.L);
+	} break;
+	case 0xC6: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		set(0, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xC7: {
+		set(0, reg.A);
+	} break;
+	case 0xC8: {
+		set(1, reg.B);
+	} break;
+	case 0xC9: {
+		set(1, reg.C);
+	} break;
+	case 0xCA: {
+		set(1, reg.D);
+	} break;
+	case 0xCB: {
+		set(1, reg.E);
+	} break;
+	case 0xCC: {
+		set(1, reg.H);
+	} break;
+	case 0xCD: {
+		set(1, reg.L);
+	} break;
+	case 0xCE: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		set(1, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xCF: {
+		set(1, reg.A);
+	} break;
+
+//	line D bit (0x6, 0xe should be 2 not 1) =======================
+
+	case 0xD0: {
+		set(2, reg.B);
+	} break;
+	case 0xD1: {
+		set(2, reg.C);
+	} break;
+	case 0xD2: {
+		set(2, reg.D);
+	} break;
+	case 0xD3: {
+		set(2, reg.E);
+	} break;
+	case 0xD4: {
+		set(2, reg.H);
+	} break;
+	case 0xD5: {
+		set(2, reg.L);
+	} break;
+	case 0xD6: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		set(2, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xD7: {
+		set(2, reg.A);
+	} break;
+	case 0xD8: {
+		set(3, reg.B);
+	} break;
+	case 0xD9: {
+		set(3, reg.C);
+	} break;
+	case 0xDA: {
+		set(3, reg.D);
+	} break;
+	case 0xDB: {
+		set(3, reg.E);
+	} break;
+	case 0xDC: {
+		set(3, reg.H);
+	} break;
+	case 0xDD: {
+		set(3, reg.L);
+	} break;
+	case 0xDE: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		set(3, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xDF: {
+		set(3, reg.A);
+	} break;
+
+//	line E bit (0x6, 0xe should be 2 not 1) =======================
+
+	case 0xE0: {
+		set(4, reg.B);
+	} break;
+	case 0xE1: {
+		set(4, reg.C);
+	} break;
+	case 0xE2: {
+		set(4, reg.D);
+	} break;
+	case 0xE3: {
+		set(4, reg.E);
+	} break;
+	case 0xE4: {
+		set(4, reg.H);
+	} break;
+	case 0xE5: {
+		set(4, reg.L);
+	} break;
+	case 0xE6: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		set(4, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xE7: {
+		set(4, reg.A);
+	} break;
+	case 0xE8: {
+		set(5, reg.B);
+	} break;
+	case 0xE9: {
+		set(5, reg.C);
+	} break;
+	case 0xEA: {
+		set(5, reg.D);
+	} break;
+	case 0xEB: {
+		set(5, reg.E);
+	} break;
+	case 0xEC: {
+		set(5, reg.H);
+	} break;
+	case 0xED: {
+		set(5, reg.L);
+	} break;
+	case 0xEE: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		set(5, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xEF: {
+		set(5, reg.A);
+	} break;
+
+//	line F bit (0x6, 0xe should be 2 not 1) =======================
+
+	case 0xF0: {
+		set(6, reg.B);
+	} break;
+	case 0xF1: {
+		set(6, reg.C);
+	} break;
+	case 0xF2: {
+		set(6, reg.D);
+	} break;
+	case 0xF3: {
+		set(6, reg.E);
+	} break;
+	case 0xF4: {
+		set(6, reg.H);
+	} break;
+	case 0xF5: {
+		set(6, reg.L);
+	} break;
+	case 0xF6: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		set(6, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xF7: {
+		set(6, reg.A);
+	} break;
+	case 0xF8: {
+		set(7, reg.B);
+	} break;
+	case 0xF9: {
+		set(7, reg.C);
+	} break;
+	case 0xFA: {
+		set(7, reg.D);
+	} break;
+	case 0xFB: {
+		set(7, reg.E);
+	} break;
+	case 0xFC: {
+		set(7, reg.H);
+	} break;
+	case 0xFD: {
+		set(7, reg.L);
+	} break;
+	case 0xFE: {// whatever hl is pointing to
+		addCycle(2);
+		uint8_t a8 = memory.view(reg.HL);
+		set(7, a8);
+		memory.write(reg.HL, a8);
+	} break;
+	case 0xFF: {
+		set(7, reg.A);
+	} break;
+
+
+	default: {
+
+	} break;
+
+
+	}
+}
 
 void SM83::execute(uint8_t opcode)
 {
@@ -371,8 +1404,7 @@ void SM83::execute(uint8_t opcode)
 		//reg.PC++;
 	}break;
 	case 0x07: { // rotate register A left 
-		reg.F = ((reg.A & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
-		reg.A = (reg.A << 1) & 0xFF;
+		rlc(reg.A);
 	}break;
 	case 0x08: { // load [a16] , SP
 		uint16_t wordAdr = memory.readWord(reg.PC);
@@ -398,8 +1430,7 @@ void SM83::execute(uint8_t opcode)
 		reg.C = memory.read(reg.PC);
 	}break;
 	case 0x0F: {   //0b00000001
-		reg.F = ((reg.A & 0b1) << 4); 
-		reg.A = (reg.A >> 1) & 0xFF;
+		rrc(reg.A);
 	}break;
 
 	//====0x1?===================================================
@@ -427,11 +1458,7 @@ void SM83::execute(uint8_t opcode)
 		reg.D = memory.read(reg.PC);
 	}break;
 	case 0x17: { // rotate register A left ,carry goes into a
-		//0bznhc0000
-		uint8_t Cbit = (reg.F & 0b00010000) >> 4; // if carry is present set it otherwise dont
-
-		reg.F = ((reg.A & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
-		reg.A = ((reg.A << 1) | Cbit) & 0xFF;
+		rl(reg.A);
 	}break;
 	case 0x18: { // jump to e8
 
@@ -458,11 +1485,7 @@ void SM83::execute(uint8_t opcode)
 		reg.E = memory.read(reg.PC);
 	}break;
 	case 0x1F: {   //RRA //0bznhc0000
-
-		uint8_t Cbit = (reg.F & 0b00010000) << 3;
-		reg.F = ((reg.A & 0b1) << 4);// grab most significant bit and position it at the carry flag
-		reg.A = ((reg.A >> 1) | Cbit) & 0xFF;
-
+		rr(reg.A);
 	}break;
 
 	//====0x2?===================================================
@@ -1129,7 +2152,13 @@ void SM83::execute(uint8_t opcode)
 		}
 	} break;
 	case 0xCB: { // sneaky 256 function thing
-		//DO THIS AFTER BREAK
+		//going to abstract this out 
+
+		uint8_t opcodeCB = memory.read(reg.PC);
+		//minimum added cycle of 8 by the looks of things
+		addCycle(2); //(does this include that fetch ?)
+
+		executePrefix(opcodeCB);
 	} break;
 	case 0xCC: {
 		uint16_t addr = memory.readWord(reg.PC);

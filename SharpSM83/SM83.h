@@ -58,6 +58,7 @@ public:
 	void reset();
 	void executeCycle();
 	void execute(uint8_t opcode);
+	void executePrefix(uint8_t opcode);
 	bool IME; // interrupt system
 
 private:
@@ -68,5 +69,6 @@ private:
 	void push(uint16_t pushData);
 	void addCycle();
 	void addCycle(uint8_t cyclesAdded);
+
 };
 #endif
