@@ -2,6 +2,8 @@
 #include "Memory.h"
 #include <cstdint>
 #include <unordered_map>
+#include <iostream>
+#include <bitset>
 
 registers reg;
 
@@ -256,7 +258,7 @@ void andByteReg(uint8_t& r8a, uint8_t r8b)
 void xorByteReg(uint8_t& r8a, uint8_t r8b)
 {
 	clearFlags();
-	r8a = r8a ^ r8b;
+	r8a ^= r8b;
 	if (r8a == 0x0)setZeroFlag();
 }
 
@@ -292,14 +294,14 @@ void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
 uint16_t SM83::popStack()
 {
 	uint16_t word  = memory.readWord(reg.SP);
-	reg.SP += 2;
+	//reg.SP += 2;
 	return word;
 }
 
 void SM83::call(uint16_t jumpAddr)
 {
 	reg.SP -= 2;//minus two bytes for word
-	memory.writeWord(reg.SP, reg.PC);
+	memory.writeWord(reg.SP, reg.PC); //T HIS MIGHT NEED TO BE PC
 	reg.PC = jumpAddr;
 }
 void SM83::push(uint16_t pushData)
@@ -378,12 +380,6 @@ void bit(uint8_t u3, uint8_t r8)
 {
 	unsetNegFlag();
 	setHalfFlag();
-	
-	//r8 (9) 0b00001001
-	//u3 (3) 0b00000011
-	// in this case 1<<u3 would work to trigger that bit
-	//r8 (9) 0b00001001 &
-	//1 << 3 0b00001000 -> returns true here
 	if (r8 & (1 << u3)) // if u3 bit is set
 	{
 		unsetZeroFlag();
@@ -393,6 +389,7 @@ void bit(uint8_t u3, uint8_t r8)
 		setZeroFlag();
 	}
 }
+
 inline void res(uint8_t u3, uint8_t& r8)
 {
 	r8 &= ~(1 << u3);
@@ -1440,6 +1437,7 @@ void SM83::execute(uint8_t opcode)
 			addCycle();
 			reg.PC += offset;
 		}
+		//std::cout << "offset is " << (int)offset << " with pc now equal to " << int(reg.PC) << std::endl;
 	}break;
 	case 0x21: { // load into bc, n16
 		reg.HL = memory.readWord(reg.PC);
@@ -1790,14 +1788,7 @@ void SM83::execute(uint8_t opcode)
 	} break;
 	case 0x76: {// HALT
 		//DO STUFF HERE (IME MODE)
-		if (IME)
-		{
-
-		}
-		else 
-		{
-
-		}
+		isHalted = true;
 	} break;
 	case 0x77: {
 		memory.write(reg.HL, reg.A);
@@ -2093,13 +2084,12 @@ void SM83::execute(uint8_t opcode)
 			reg.PC = addr;
 		}
 	} break;
-	case 0xCB: { // sneaky 256 function thing
-		//going to abstract this out 
+	case 0xCB: { 
 
 		uint8_t opcodeCB = memory.read(reg.PC);
 		//minimum added cycle of 8 by the looks of things
 		addCycle(2); //(does this include that fetch ?)
-
+		//std::cout << (int)opcodeCB << " Is the opcode Cb val" << std::endl;
 		executePrefix(opcodeCB);
 	} break;
 	case 0xCC: {
@@ -2110,7 +2100,7 @@ void SM83::execute(uint8_t opcode)
 			call(addr);
 		}
 	} break;
-	case 0xCD: { // call n16
+	case 0xCD: { // call n16 THIS MIGHT BE BREAKING BOOT
 		uint16_t jumpAddr = memory.readWord(reg.PC);
 		call(jumpAddr);
 	} break;
@@ -2288,7 +2278,7 @@ void SM83::execute(uint8_t opcode)
 		reg.A = memory.read(tempAddr);
 	} break;
 	case 0xFB: { //empty
-		IME = true;
+		IME_nextCycle = true;
 	} break;
 	case 0xFC: { //empty
 	} break;
@@ -2305,11 +2295,20 @@ void SM83::execute(uint8_t opcode)
 		printf("No opcode implemented for : %d", opcode);
 	}break;
 	}
+	/*									/*
+	*	end of giant switch statement	 *
+	*/									//
+
+	if (IME_nextCycle)
+	{
+		IME = true;
+		IME_nextCycle = false;
+	}
 }
 
 void SM83::reset()
 {
-	reg.PC = 0;
+	reg.PC = 0; // put this to 0x100 for skipping boot rom
 	reg.SP = 0xFFFE;
 	reg.AF = 0;
 	reg.BC = 0;
@@ -2319,13 +2318,20 @@ void SM83::reset()
 	memory.reset();
 }
 
-void SM83::executeCycle()
+void SM83::handleInterrupts()
 {
-	//if (cycles > 0) {
-		uint8_t opcode = memory.read(reg.PC);
-		cycles = opcodeCycles[opcode];
+	
+}
 
-		execute(opcode);
-	//}
-	//cycles--;
+uint8_t SM83::executeCycle()
+{
+	uint8_t opcode = memory.read(reg.PC);
+		//cycles = opcodeCycles[opcode]; // i think the fetch adds another 4 on top
+		//handleInterrupts();
+
+	//std::cout << std::hex << (int)opcode << " at PC : " << std::hex <<(int)reg.PC-1<<" | here are reg: " << std::hex << (int)reg.F<< '\n';
+	//std::cout << "Current Stack Item" << (int)memory.view(reg.SP + 1) << (int)memory.view(reg.SP) << '\n';
+
+	execute(opcode);
+	return opcodeCycles[opcode];
 }

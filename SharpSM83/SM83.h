@@ -56,13 +56,16 @@ class SM83 {
 public:
 	SM83(Memory& memory);
 	void reset();
-	void executeCycle();
+	uint8_t executeCycle();
 	void execute(uint8_t opcode);
 	void executePrefix(uint8_t opcode);
-	bool IME; // interrupt system
-
+	void handleInterrupts();
+	bool IME= false; // interrupt system
+	bool IME_nextCycle = false;
+	bool isHalted = false;
+	int cycles{};
 private:
-	uint8_t cycles;
+
 	Memory& memory;
 	uint16_t popStack();
 	void call(uint16_t jumpAddr);
