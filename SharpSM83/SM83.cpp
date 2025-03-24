@@ -39,31 +39,41 @@ registers reg;
 */
 //std::unordered_map<uint8_t, uint8_t> opcodeCycles = { };
 
-uint8_t opcodeCycles[0xFF]
+uint8_t opcodeCycles[0x100]
 {
-/////////////////////////////////////////////////////////////
-// //  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F  //  //
-/////////////////////////////////////////////////////////////
-/*0*/												    /*0*/
-/*1*/												    /*1*/
-/*2*/												    /*2*/
-/*3*/												    /*3*/
-/*4*/												    /*4*/
-/*5*/												    /*5*/
-/*6*/												    /*6*/
-/*7*/												    /*7*/
-/*8*/												    /*8*/
-/*9*/												    /*9*/
-/*A*/												    /*A*/
-/*B*/												    /*B*/
-/*C*/												    /*C*/
-/*D*/												    /*D*/
-/*E*/												    /*E*/
-/*F*/												    /*F*/
-/////////////////////////////////////////////////////////////
-// //  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F  //  //
-/////////////////////////////////////////////////////////////
-}
+	/////////////////////////////////////////////////////////////
+	//*//  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   //x//
+	/////////////////////////////////////////////////////////////
+	/*0*/  1 ,3 ,2 ,2 ,1 ,1 ,2 ,1 ,5 ,2 ,2 ,2 ,1 ,1 ,2 ,1 , /*0*/
+	/*1*/  1 ,3 ,2 ,2 ,1 ,1 ,2 ,1 ,3 ,2 ,2 ,2 ,1 ,1 ,2 ,1 , /*1*/
+	/*2*/  2 ,3 ,2 ,2 ,1 ,1 ,2 ,1 ,2 ,2 ,2 ,2 ,1 ,1 ,2 ,1 , /*2*/
+	/*3*/  2 ,3 ,2 ,2 ,3 ,3 ,3 ,1 ,2 ,2 ,2 ,2 ,1 ,1 ,2 ,1 , /*3*/
+	/*4*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*4*/
+	/*5*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*5*/
+	/*6*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*6*/
+	/*7*/  2 ,2 ,2 ,2 ,2 ,2 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*7*/
+	/*8*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*8*/
+	/*9*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*9*/
+	/*A*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*A*/
+	/*B*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*B*/
+	/*C*/  2 ,3 ,3 ,4 ,3 ,4 ,2 ,4 ,2 ,4 ,3 ,1 ,3 ,6 ,2 ,4 , /*C*/
+	/*D*/  2 ,3 ,3 ,0 ,3 ,4 ,2 ,4 ,2 ,4 ,3 ,0 ,3 ,0 ,2 ,4 , /*D*/
+	/*E*/  3 ,3 ,2 ,0 ,0 ,4 ,2 ,4 ,4 ,1 ,4 ,0 ,0 ,0 ,2 ,4 , /*E*/
+	/*F*/  3 ,3 ,2 ,1 ,0 ,4 ,2 ,4 ,3 ,2 ,4 ,1 ,0 ,0 ,2 ,4 , /*F*/
+	/////////////////////////////////////////////////////////////
+	//x//  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   //*//
+	/////////////////////////////////////////////////////////////
+};
+
+//the following add an extra cycle if a term is met
+/*
+*
+* 20 , 28
+* 30 , 38
+* c0 , c2, c4, c8, cA , CC, 
+* d0 , d2, d4, d8, dA , dC, 
+* 
+*/
 
 SM83::SM83(Memory& memory) : memory(memory){};
 
@@ -103,6 +113,16 @@ bool isHalfFlag()
 bool isCarryFlag()
 {
 	return (reg.F >> 4) & 0b1;
+}
+
+void SM83::addCycle()
+{
+	cycles++;
+}
+
+void SM83::addCycle(uint8_t cyclesAdded)
+{
+	cycles+=cyclesAdded;
 }
 
 
@@ -452,6 +472,7 @@ void SM83::execute(uint8_t opcode)
 		int8_t offset = memory.read(reg.PC); // pc = 129
 		if (!isZeroFlag)
 		{
+			addCycle();
 			reg.PC += offset;
 		}
 	}break;
@@ -520,6 +541,7 @@ void SM83::execute(uint8_t opcode)
 		int8_t offset = memory.read(reg.PC); // pc = 129
 		if (isZeroFlag())
 		{
+			addCycle();
 			reg.PC += offset;
 		}
 
@@ -556,6 +578,7 @@ void SM83::execute(uint8_t opcode)
 		int8_t offset = memory.read(reg.PC); // pc = 129
 		if (!isCarryFlag())
 		{
+			addCycle();
 			reg.PC += offset;
 		}
 	}break;
@@ -594,6 +617,7 @@ void SM83::execute(uint8_t opcode)
 		int8_t offset = memory.read(reg.PC); // pc = 129
 		if (isCarryFlag())
 		{
+			addCycle();
 			reg.PC += offset;
 		}
 
@@ -1049,6 +1073,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xC0: { // ret NZ 
 		if (!isZeroFlag())
 		{
+			addCycle(3);
 			reg.PC = popStack();
 		}
 	} break;
@@ -1059,6 +1084,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t addr = memory.readWord(reg.PC);
 		if (!isZeroFlag())
 		{
+			addCycle();
 			reg.PC = addr;
 		}
 	} break;
@@ -1070,6 +1096,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t addr = memory.readWord(reg.PC);
 		if (!isZeroFlag())
 		{
+			addCycle(3);
 			call(addr);
 		}
 	} break;
@@ -1085,6 +1112,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xC8: { 
 		if (isZeroFlag())
 		{
+			addCycle(3);
 			reg.PC = popStack();
 		}
 	} break;
@@ -1096,6 +1124,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t addr = memory.readWord(reg.PC);
 		if (isZeroFlag())
 		{
+			addCycle();
 			reg.PC = addr;
 		}
 	} break;
@@ -1106,6 +1135,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t addr = memory.readWord(reg.PC);
 		if (isZeroFlag())
 		{
+			addCycle(3);
 			call(addr);
 		}
 	} break;
@@ -1125,6 +1155,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xD0: { // ret NZ 
 		if (!isCarryFlag())
 		{
+			addCycle(3);
 			reg.PC = popStack();
 		}
 	} break;
@@ -1135,6 +1166,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t addr = memory.readWord(reg.PC);
 		if (!isCarryFlag())
 		{
+			addCycle();
 			reg.PC = addr;
 		}
 	} break;
@@ -1145,6 +1177,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t addr = memory.readWord(reg.PC);
 		if (!isCarryFlag())
 		{
+			addCycle(3);
 			call(addr);
 		}
 	} break;
@@ -1160,6 +1193,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xD8: {
 		if (isCarryFlag())
 		{
+			addCycle(3);
 			reg.PC = popStack();
 		}
 	} break;
@@ -1172,6 +1206,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t addr = memory.readWord(reg.PC);
 		if (isCarryFlag())
 		{
+			addCycle(1);
 			reg.PC = addr;
 		}
 	} break;
@@ -1181,6 +1216,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t addr = memory.readWord(reg.PC);
 		if (isCarryFlag())
 		{
+			addCycle(3);
 			call(addr);
 		}
 	} break;
