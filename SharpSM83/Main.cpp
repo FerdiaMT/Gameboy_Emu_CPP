@@ -92,6 +92,17 @@ int main()
 {
 	Memory memory;
 	SM83 cpu(memory);
+    /*
+    *
+    * Things to make :
+    * 
+    * Cartridge
+    * PPU
+    * timer
+    * screen mabye ?
+    * input 
+    * interrupts as seperate class, mabye
+    */
 
 	cpu.reset();
 
