@@ -147,11 +147,55 @@
 * bit 0 0 ~ BG & window enable/ priority 
 * 
 * LcDC ~ very powerful, since it can be modified any time during the frame 
+* 
+* 
+* frame is drawn in 154 scanlines
+* first 144 drawn top to bottom, left to right 
+* you can modify rendering paramters halfway through
+* 4 dots per M-Cycle
+* ppu togles between mode2 (OAM scan) , mode3 (drawing pixels), mode 0 (horizontal blank)
+* while ppu is accessing vram, that mem is inacessible to cpu
+* 
+* Mode 2 ~ searching for objs which overlap current line , can access VRAM
+* Mode 3 ~ Sends pixels to the lcd , cant acess anything
+* Mode 0 ~ Waits until the end of the scanline 
 */
 uint16_t Mem{};
 
+/*
+	stat summary => 
+	
+	0xFF40 LCDC control 
+	0xFF41 LCD Status STAT interrupt ~~ 0b6 , if set, selects LYC = LY condition
+										0b5 ~ mode 2, b4 mode 1, b3 mode 0
+										0b2 ~ set when LY contains LYC, constantly updated
+										0b1 / 0b0 ~ reposrts ppu current status, 0 when ppu is off
 
-PPU::PPU(Memory& memory)
+	0xFF42 SCY ~ specify topLeft coord of visible 256*256 in 160*144 screen
+	0xFF43 SCX ~ same but for x // bottom = (SCY + 143) % 256 and right := (SCX + 159) % 256
+
+
+	0xFF44 LCD Y co-ord ~~ indicated the current horizontal line being drawn
+	0xFF45 LY compare ~~ LYC and LY contantly compares, when both identical, LYC=LY flag is set in STAT
+
+	0xFF46 OAM DMA source address + start
+
+	0xFF47 ~ bgp = BG pallette data (0b76 = ID3, 54->2 , 32-> 1, 10->0)
+	0xFF48 ~ obp0 data
+	0xFF49 ~ obp1 data
+
+	0xFF4A WindowX ~ on screen coordinate of windows top left pixel
+	0xFF4B WindowY ~ same here
+
+	//-------------------------------
+	0xFF4c ~ doesnt exist 
+	0xFF4D ~ prepare speed switch
+
+
+
+*/
+
+PPU::PPU(Memory& memory, ) //m cycle (using this) = 4 t states
 {
 
 }
