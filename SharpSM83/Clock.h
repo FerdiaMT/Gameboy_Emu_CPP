@@ -4,11 +4,11 @@
 #include <cstdint>
 #include "Memory.h"
 #include "SM83.h"
-class PPU
+class Clock
 {
 public:
-	PPU(Memory& memory);
-	void resetPPU();
+	Clock(Memory& memory);
+	void resetClock();
 private:
 
 

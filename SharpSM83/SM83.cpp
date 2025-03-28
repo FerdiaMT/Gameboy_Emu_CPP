@@ -1339,7 +1339,7 @@ void SM83::execute(uint8_t opcode)
 		decByte(reg.B);
 	}break;
 	case 0x06: {
-		reg.B = memory.read(reg.PC);
+		reg.B = memory.read(reg.PC); reg.PC++;
 		//reg.PC++;
 	}break;
 	case 0x07: { // rotate register A left 
@@ -1354,7 +1354,7 @@ void SM83::execute(uint8_t opcode)
 		addWordReg(reg.HL, reg.BC);
 	}break;
 	case 0x0A: {// load into A, [bc]
-		reg.A = memory.read(reg.BC);
+		reg.A = memory.read(reg.BC); reg.BC++;
 	}break;
 	case 0x0B: {
 		reg.BC--;
@@ -1366,7 +1366,7 @@ void SM83::execute(uint8_t opcode)
 		decByte(reg.C);
 	}break;
 	case 0x0E: {
-		reg.C = memory.read(reg.PC);
+		reg.C = memory.read(reg.PC); reg.PC++;
 	}break;
 	case 0x0F: {   //0b00000001
 		rrc(reg.A);
@@ -1376,7 +1376,7 @@ void SM83::execute(uint8_t opcode)
 
 	case 0x10: { // STOP, this is a funny one TODO: look into this in pandocs
 		//i think we take in another byte ?
-		memory.read(reg.PC);
+		memory.read(reg.PC); reg.PC++;
 	}break;
 	case 0x11: { // load into bc, n16
 		reg.DE = memory.readWord(reg.PC);
@@ -1394,14 +1394,14 @@ void SM83::execute(uint8_t opcode)
 		decByte(reg.D);
 	}break;
 	case 0x16: {
-		reg.D = memory.read(reg.PC);
+		reg.D = memory.read(reg.PC); reg.PC++;
 	}break;
 	case 0x17: { // rotate register A left ,carry goes into a
 		rl(reg.A);
 	}break;
 	case 0x18: { // jump to e8
 
-		int8_t offset = memory.read(reg.PC); // pc = 129
+		int8_t offset = memory.read(reg.PC); reg.PC++; // pc = 129
 		reg.PC += offset;
 
 	}break;
@@ -1409,7 +1409,7 @@ void SM83::execute(uint8_t opcode)
 		addWordReg(reg.HL, reg.DE);
 	}break;
 	case 0x1A: {
-		reg.A = memory.read(reg.DE);
+		reg.A = memory.read(reg.DE); reg.DE++;
 	}break;
 	case 0x1B: {
 		reg.DE--;
@@ -1421,7 +1421,7 @@ void SM83::execute(uint8_t opcode)
 		decByte(reg.E);
 	}break;
 	case 0x1E: {
-		reg.E = memory.read(reg.PC);
+		reg.E = memory.read(reg.PC) ; reg.PC++;
 	}break;
 	case 0x1F: {   //RRA //0bznhc0000
 		rr(reg.A);
@@ -1431,7 +1431,7 @@ void SM83::execute(uint8_t opcode)
 
 	case 0x20: { // JR NZ , e8
 		// jump to e8 if NotZ is met
-		int8_t offset = memory.read(reg.PC); // pc = 129
+		int8_t offset = memory.read(reg.PC);  reg.PC++; // pc = 129
 		if (!isZeroFlag())
 		{
 			addCycle();
@@ -1456,7 +1456,7 @@ void SM83::execute(uint8_t opcode)
 		decByte(reg.H);
 	}break;
 	case 0x26: {
-		reg.H = memory.read(reg.PC);
+		reg.H = memory.read(reg.PC); reg.PC++;
 	}break;
 	case 0x27: { // DAA (confusing one)
 		//check if n is set
@@ -1501,7 +1501,7 @@ void SM83::execute(uint8_t opcode)
 	}break;
 	case 0x28: { // jump to e8
 
-		int8_t offset = memory.read(reg.PC); // pc = 129
+		int8_t offset = memory.read(reg.PC);  reg.PC++; // pc = 129
 		if (isZeroFlag())
 		{
 			addCycle();
@@ -1513,8 +1513,7 @@ void SM83::execute(uint8_t opcode)
 		addWordReg(reg.HL, reg.HL);
 	}break;
 	case 0x2A: {
-		reg.A = memory.read(reg.HL);
-		reg.HL++;
+		reg.A = memory.read(reg.HL); reg.HL++;
 	}break;
 	case 0x2B: {
 		reg.HL--;
@@ -1526,7 +1525,7 @@ void SM83::execute(uint8_t opcode)
 		decByte(reg.L);
 	}break;
 	case 0x2E: {
-		reg.L = memory.read(reg.PC);
+		reg.L = memory.read(reg.PC);  reg.PC++;
 	}break;
 	case 0x2F: {   // COMPLEMENT
 		setNegFlag();
@@ -1538,7 +1537,7 @@ void SM83::execute(uint8_t opcode)
 	//====0x3?===================================================
 
 	case 0x30: { // JR Z , e8
-		int8_t offset = memory.read(reg.PC); // pc = 129
+		int8_t offset = memory.read(reg.PC);  reg.PC++; // pc = 129
 		if (!isCarryFlag())
 		{
 			addCycle();
@@ -1567,7 +1566,7 @@ void SM83::execute(uint8_t opcode)
 		memory.write(reg.HL, byte);
 	}break;
 	case 0x36: {
-		memory.write(reg.HL, memory.read(reg.PC));// load into address hl, data held in next pc
+		memory.write(reg.HL, memory.read(reg.PC));  reg.PC++;// load into address hl, data held in next pc
 	}break;
 	case 0x37: { // SCF (confusing one)
 		bool z = isZeroFlag;
@@ -1577,7 +1576,7 @@ void SM83::execute(uint8_t opcode)
 	}break;
 	case 0x38: { // jump to e8
 
-		int8_t offset = memory.read(reg.PC); // pc = 129
+		int8_t offset = memory.read(reg.PC);  reg.PC++; // pc = 129
 		if (isCarryFlag())
 		{
 			addCycle();
@@ -1589,7 +1588,7 @@ void SM83::execute(uint8_t opcode)
 		addWordReg(reg.HL, reg.SP);
 	}break;
 	case 0x3A: {
-		reg.A = memory.read(reg.HL);
+		reg.A = memory.read(reg.HL);  reg.HL++;
 		reg.HL--;
 	}break;
 	case 0x3B: {
@@ -1602,7 +1601,7 @@ void SM83::execute(uint8_t opcode)
 		decByte(reg.A);
 	}break;
 	case 0x3E: {
-		reg.A = memory.read(reg.PC);
+		reg.A = memory.read(reg.PC);  reg.PC++;
 	}break;
 	case 0x3F: {   // CCF
 
@@ -2060,7 +2059,7 @@ void SM83::execute(uint8_t opcode)
 		push(reg.BC);
 	} break;
 	case 0xC6: { //ADD A n8
-		addByteReg(reg.A, memory.read(reg.PC));
+		addByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xC7: { //RST $00
 		call(0x00);
@@ -2086,7 +2085,7 @@ void SM83::execute(uint8_t opcode)
 	} break;
 	case 0xCB: { 
 
-		uint8_t opcodeCB = memory.read(reg.PC);
+		uint8_t opcodeCB = memory.read(reg.PC);  reg.PC++;
 		//minimum added cycle of 8 by the looks of things
 		addCycle(2); //(does this include that fetch ?)
 		//std::cout << (int)opcodeCB << " Is the opcode Cb val" << std::endl;
@@ -2105,7 +2104,7 @@ void SM83::execute(uint8_t opcode)
 		call(jumpAddr);
 	} break;
 	case 0xCE: {
-		addCarryByteReg(reg.A, memory.read(reg.PC));
+		addCarryByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xCF: {
 		call(0x08);
@@ -2146,7 +2145,7 @@ void SM83::execute(uint8_t opcode)
 		push(reg.DE);
 	} break;
 	case 0xD6: { //SUB A n8
-		subByteReg(reg.A, memory.read(reg.PC));
+		subByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xD7: { //RST $10
 		call(0x10);
@@ -2184,7 +2183,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xDD: { // empty
 	} break;
 	case 0xDE: {
-		subCarryByteReg(reg.A, memory.read(reg.PC));
+		subCarryByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xDF: {
 		call(0x18);
@@ -2193,7 +2192,7 @@ void SM83::execute(uint8_t opcode)
 	//====0xE?===============================================================
 
 	case 0xE0: { // LDH [a8] a
-		uint8_t addr = memory.read(reg.PC);
+		uint8_t addr = memory.read(reg.PC);  reg.PC++;
 		uint16_t memAddr = addr + 0xFF00; // not sure on this part
 		memory.write(memAddr, reg.A);
 	} break;
@@ -2212,13 +2211,13 @@ void SM83::execute(uint8_t opcode)
 		push(reg.HL);
 	} break;
 	case 0xE6: { //AND A n8
-		andByteReg(reg.A, memory.read(reg.PC));
+		andByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xE7: { //RST $10
 		call(0x20);
 	} break;
 	case 0xE8: {//add sp ,e8
-		int8_t e8 = memory.read(reg.PC);
+		int8_t e8 = memory.read(reg.PC);  reg.PC++;
 		addWordRegSigned(reg.SP, e8);
 	} break;
 	case 0xE9: {
@@ -2235,7 +2234,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xED: { // empty
 	} break;
 	case 0xEE: {
-		xorByteReg(reg.A, memory.read(reg.PC));
+		xorByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xEF: {
 		call(0x28);
@@ -2244,13 +2243,13 @@ void SM83::execute(uint8_t opcode)
 	//====0xF?===============================================================
 
 	case 0xF0: { // LDH  a [a8]
-		reg.A = memory.read(reg.PC);
+		reg.A = memory.read(reg.PC); reg.PC++;
 	} break;
 	case 0xF1: {
 		reg.AF = popStack();
 	} break;
 	case 0xF2: {
-		reg.C = memory.read(reg.PC);
+		reg.C = memory.read(reg.PC);  reg.PC++;
 	} break;
 	case 0xF3: { // DI (what does this mean)
 		IME = false;
@@ -2261,13 +2260,13 @@ void SM83::execute(uint8_t opcode)
 		push(reg.AF);
 	} break;
 	case 0xF6: { //AND A n8
-		orByteReg(reg.A, memory.read(reg.PC));
+		orByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xF7: { //RST $10
 		call(0x30);
 	} break;
 	case 0xF8: {//load into reg.hl, SP + e8
-		int8_t byte = memory.read(reg.PC);
+		int8_t byte = memory.read(reg.PC);  reg.PC++;
 		reg.HL = reg.SP + byte;
 	} break;
 	case 0xF9: {
@@ -2285,7 +2284,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xFD: { // empty
 	} break;
 	case 0xFE: {
-		compareByteReg(reg.A, memory.read(reg.PC));
+		compareByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xFF: {
 		call(0x38);
@@ -2325,7 +2324,7 @@ void SM83::handleInterrupts()
 
 uint8_t SM83::executeCycle()
 {
-	uint8_t opcode = memory.read(reg.PC);
+	uint8_t opcode = memory.read(reg.PC); reg.PC++;
 		//cycles = opcodeCycles[opcode]; // i think the fetch adds another 4 on top
 		//handleInterrupts();
 

@@ -190,12 +190,27 @@ uint16_t Mem{};
 	//-------------------------------
 	0xFF4c ~ doesnt exist 
 	0xFF4D ~ prepare speed switch
-
-
-
 */
 
-PPU::PPU(Memory& memory, ) //m cycle (using this) = 4 t states
+#define LCDC 0xFF40;
+#define STAT 0xFF41; // lcd status
+#define	SCY  0xFF42; // screen y 
+#define	SCX  0xFF43; // screen x
+#define LY   0xFF44; // LCD Y coordinate
+#define LYC  0xFF45; // LY compare
+#define DMA  0xFF46; // OAM dma
+#define BGP  0xFF47; // background pallete
+#define OBP0 0xFF48; // obj p 0
+#define OBP1 0xFF49; // obj p 1
+#define WY   0xFF4A; // window x 
+#define WX   0xFF4B; // window y 
+
+PPU::PPU(Memory& memory) //m cycle (using this) = 4 t states
+{
+
+}
+
+void PPU::resetPPU()
 {
 
 }
