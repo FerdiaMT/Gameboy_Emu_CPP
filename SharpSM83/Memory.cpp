@@ -100,7 +100,7 @@ uint8_t Memory::read(uint16_t address) // adress auto increment
 	else if (address <= IO_UB) // i should have no return
 	{
 
-		if (address = 0xFF46)
+		if (address == 0xFF46)
 		{
 //			dmaTransfer();
 			return -1;
@@ -117,6 +117,7 @@ uint8_t Memory::read(uint16_t address) // adress auto increment
 	else
 	{
 		//something went really wrong if it gets to here
+		return 0;
 	}
 }
 

@@ -55,9 +55,6 @@ public:
 	void setInterruptSerial();
 	void setInterruptJoypad();
 
-
-
-
 private:
 
 	uint8_t vram[0x2000]{}; // video ram

@@ -1615,7 +1615,7 @@ void SM83::execute(uint8_t opcode)
 		bool z = isZeroFlag();
 		bool c = isCarryFlag();
 		clearFlags();
-		if (z) setZeroFlag;
+		if (z) setZeroFlag();
 		if (!c)setCarryFlag();
 	}break;
 
@@ -1794,7 +1794,28 @@ void SM83::execute(uint8_t opcode)
 	} break;
 	case 0x76: {// HALT
 		//DO STUFF HERE (IME MODE)
-		isHalted = true;
+		if (IME)
+		{
+			// CPU enteters low poer mode until after an interupt is about to be serviced
+		}
+		else 
+		{
+			//check if there is an interrupt pending
+
+			if (memory.ioFetchIF() == 0)
+			{
+				while (memory.ioFetchIF() == 0)
+				{
+					// if there is currently nothing pending, do nothing;
+				}
+			}
+			else
+			{
+				// pc is not incremented due to hardware bug ?
+				reg.PC--; // this feels very wrong, check this later
+			}
+		}
+
 	} break;
 	case 0x77: {
 		memory.write(reg.HL, reg.A);
@@ -2326,7 +2347,7 @@ void SM83::reset()
 void SM83::handleInterrupts()
 {
 	if (!IME) return; // check is interrupt requested
-	uint8_t IF = memory.read(0xFF0F);
+	uint8_t IF = memory.ioFetchIF();
 	if (!IF)return;
 	uint8_t IE = memory.read(0xFF0F);
 	if (!IE)return;
@@ -2404,6 +2425,7 @@ uint8_t SM83::executeInstruction()
 	reg.PC++;
 
 	execute(opcode); // decode - execute
+	//std::cout << std::hex <<(int)opcode << std::endl;
 	return opcodeCycles[opcode];
 }
 

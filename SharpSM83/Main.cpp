@@ -169,7 +169,6 @@ int main()
 
     auto lastCycleTime = std::chrono::high_resolution_clock::now();
 
-    int curModulo = 64;
 
     while(running)
     {
@@ -192,10 +191,10 @@ int main()
                 //for each cycle too fast, wait 952ns
                 auto wait = (waitCycle) * 952ns;
                 std::this_thread::sleep_for(wait);
-                std::cout << 17573 << std::endl;
+                //std::cout << 17573 << std::endl;
             }
             else {
-                std::cout << allCycles << std::endl;
+               // std::cout << allCycles << std::endl;
             }
 
            
