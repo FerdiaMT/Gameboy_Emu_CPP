@@ -27,6 +27,14 @@
 #define HR_LB   0xFF80
 #define HR_UB   0xFFFE
 
+
+/*
+MAINTENANCE REQUIRED : REMOVE THE VIEW AND VIEWWORD FUNCTIONS
+					   FIGURE OUT WHAT TO DO FOR RESET
+*/
+
+
+
 // 0xFFFF is the interupt enable register
 
 /*
@@ -74,7 +82,7 @@ uint8_t Memory::read(uint16_t address) // adress auto increment
 	}
 	else if (address <= WRAM_UB)
 	{
-		return wram[address - CARTRAM_LB];
+		return wram[address - WRAM_LB];
 	}
 	else if (address <= OAM_UB)
 	{
@@ -110,82 +118,83 @@ uint8_t Memory::read(uint16_t address) // adress auto increment
 	{
 		//something went really wrong if it gets to here
 	}
-
-	//if(address >= ROM_LB &&)
-
-	//if (address >= VRAM_LB && address <= VRAM_UB) // if accesing vram
-	//{
-	//	uint8_t temp = vram[address-VRAM_LB];
-	//	address++;
-	//	return temp;
-	//}
-	//else if (address >= OAM_LB && address <= OAM_UB) // if accesing OAM
-	//{ 
-
-	//	if (OAM_DMA_ACTIVE) 
-	//	{
-	//		return 0xFF; // return junk if OAM DMA is currenlty active
-	//	}
-	//	else 
-	//	{
-	//		uint8_t temp = oam[address - OAM_LB];
-	//		address++;
-	//		return temp;
-	//	}
-	//}
-	//else if (address >= IO_LB && address <= IO_UB) 
-	//{
-	//	if (address = 0xFF46)
-	//	{
-	//		//dmaTransfer();
-	//	}
-	//}
-	//else if (address >= HR_LB && address <= HR_UB) 
-	//{
-
-	//}
-	//else 
-	//{
-	//	uint8_t temp = ram[address]; // this one needs to be abstrated 
-	//	address++;
-	//	return temp;
-	//}
 }
 
-uint16_t Memory::readWord(uint16_t& address)
+uint16_t Memory::readWord(uint16_t address)
 {
-	uint16_t low = ram[address];
+	uint16_t low = read(address);
 	address++;
-	uint16_t high = ram[address];
+	uint16_t high = read(address);
 	address++;
 	return (high << 8) | low;
 }
 
 
-uint8_t Memory::view(uint16_t address) // adress doesnt increment
+uint8_t Memory::view(uint16_t address) // remove this later
 {
-	uint8_t temp = ram[address];
+	uint8_t temp{};// = ram[address];
 	return temp;
 }
 
-uint16_t Memory::viewWord(uint16_t address) // adress doesnt increment
+uint16_t Memory::viewWord(uint16_t address) // same ghere
 {
-	uint16_t low = ram[address];
+	uint16_t low = {};// ram[address];
 	address++;
-	uint16_t high = ram[address];
+	uint16_t high = {};//ram[address];
 	return (high << 8) | low;
 }
 
 
 void Memory::write(uint16_t address, uint8_t data)
 {
-	ram[address] = data;
+
+	if (address <= ROM_UB)
+	{
+		rom[address] = data;
+	}
+	else if (address <= ROMBANK_UB)
+	{
+		romBank[address - ROMBANK_LB] = data;
+	}
+	else if (address <= VRAM_UB)
+	{
+		vram[address - VRAM_LB] = data;
+	}
+	else if (address <= CARTRAM_UB)
+	{
+		cartRam[address - CARTRAM_LB] = data;
+	}
+	else if (address <= WRAM_UB)
+	{
+		wram[address - WRAM_LB] = data;
+	}
+	else if (address <= OAM_UB)
+	{
+
+		oam[address - OAM_LB] = data;
+
+	}
+	else if (address <= IO_UB) // i should have no return
+	{
+
+		io[address - IO_LB] = data;
+
+	}
+	else if (address <= HR_UB)
+	{
+		hram[address - HR_LB] = data;
+	}
+	else
+	{
+		//something went really wrong if it gets to here
+	}
+
 }
 
 void Memory::writeWord(uint16_t address, uint16_t data)
 {
-	ram[address] = data & 0xFF;
-	ram[address + 1] = ((data >> 8) & 0x00FF);
+	write(address,(data & 0xFF));
+	write(address, (data >> 8) & 0x00FF);
 }
 
 
@@ -194,8 +203,121 @@ void Memory::reset()
 {
 
 }
-void Memory::reset()
-{
 
+//THE 0 PAGE HAS DIRECT FETCHES , TO BETTER EMULATE GAMRBOY FETCH SPEEDS
+
+uint8_t Memory::ioFetchJOYP()
+{
+	return io[0];
+}
+
+uint8_t Memory::ioFetchSB()
+{
+	return io[1];
+}
+
+uint8_t Memory::ioFetchSC()
+{
+	return io[2];
+}
+
+uint8_t Memory::ioFetchDIV()
+{
+	return io[4];
+}
+
+uint8_t Memory::ioFetchTIMA()
+{
+	return io[5];
+}
+
+uint8_t Memory::ioFetchTMA()
+{
+	return io[6];
+}
+
+uint8_t Memory::ioFetchTAC()
+{
+	return io[7];
+}
+
+uint8_t Memory::ioFetchIF()
+{
+	return io[0x0F];
+}
+
+void Memory::ioWriteJOYP(uint8_t data)
+{
+	io[0x0] = data;
+}
+
+void Memory::ioWriteSB(uint8_t data)
+{
+	io[0x1] = data;
+}
+
+void Memory::ioWriteSC(uint8_t data)
+{
+	io[0x2] = data;
+}
+
+void Memory::ioWriteDIV(uint8_t data)
+{
+	io[0x4] = data;
+}
+
+void Memory::ioWriteTIMA(uint8_t data)
+{
+	io[0x5] = data;
+}
+
+void Memory::ioWriteTMA(uint8_t data)
+{
+	io[0x6] = data;
+}
+
+void Memory::ioWriteTAC(uint8_t data)
+{
+	io[0x7] = data;
+}
+
+void Memory::ioWriteIF(uint8_t data)
+{
+	io[0xF] = data;
+}
+
+void Memory::ioIncrementDIV()
+{
+	io[0x4]++;
+}
+
+void Memory::ioIncrementTIMA()
+{
+	io[0x5]++;
+}
+
+void Memory::setInterruptVBlank()
+{
+	io[0x0F] |= 0b00001;
+}
+
+void Memory::setInterruptLCD()
+{
+	io[0x0F] |= 0b00010;
+}
+
+void Memory::setInterruptTimer()
+{
+	io[0x0F] |= 0b00100;
+}
+
+void Memory::setInterruptSerial()
+{
+	io[0x0F] |= 0b01000;
+}
+
+void Memory::setInterruptJoypad()
+{
+	io[0x0F] |= 0b10000;
 }
 

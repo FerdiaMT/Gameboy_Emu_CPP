@@ -136,10 +136,14 @@ double cpuCyclesPerFrame = 4194304.0 / 59.7;
 int main()
 {
 	Memory memory;
-    Clock clock(memory);
+
+    
 
 	SM83 cpu(memory);
+
     PPU ppu(memory);
+
+    Clock clock(memory);
 
 	cpu.reset();
     memory.reset();
@@ -159,10 +163,56 @@ int main()
     setupSDL();
     SDL_Event event;
 
+    //going to do this without the whole clock class for now
+
+    int allCycles{};
+
+    auto lastCycleTime = std::chrono::high_resolution_clock::now();
+
+    int curModulo = 64;
 
     while(running)
     {
-        cpu.executeCycle(1);
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
+        
+
+        if (dt >= 16.73) // once every 60 seconds (16.73 milliseconds)
+        {
+            // a machine cycle takes 0.000952 milliseconds
+            // so cycles should currently be on 17573.5294118
+            //if not, wait that amount
+            int waitCycle = allCycles - 17573;
+
+
+            if (waitCycle > 0)
+            {
+                using namespace std::chrono_literals;
+                //for each cycle too fast, wait 952ns
+                auto wait = (waitCycle) * 952ns;
+                std::this_thread::sleep_for(wait);
+                std::cout << 17573 << std::endl;
+            }
+            else {
+                std::cout << allCycles << std::endl;
+            }
+
+           
+            lastCycleTime = currentTime;
+            allCycles = 0;
+            cpu.cycles = 0; // i know this is bad practice, but this is just demoing my idea
+        }
+
+        allCycles++;
+
+        cpu.executeCycle(allCycles);
+
+        ///////////////////////////////////Clock stuff
+
+        clock.handleTimers(allCycles);
+
+        ///////////////////////////////////////////////
 
         while (SDL_PollEvent(&event))
         {
@@ -185,3 +235,13 @@ int main()
 
 	return 0;
 }
+
+// so what i could do to solve this timer problem
+//let the while loop run, each time adding 1 to my currentCycle
+//each time query cpu, seeing if the next opcode has enough machine cycles to execute
+//each m cycle do the clock stuff
+//keep a REAL time, as in time to execute program.
+// every thousand cycles or so check the amount of cycles have executed
+// (mabye every 1/60th of a second would work nice)
+// then calculate how long it should of taken to execute those cycles
+// then just sleep the main loop for that difference of time

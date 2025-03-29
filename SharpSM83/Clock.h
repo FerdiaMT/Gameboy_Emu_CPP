@@ -9,16 +9,12 @@ class Clock
 public:
 	Clock(Memory& memory);
 	void resetClock();
-	void increment(int& cycleDelay);
-
-
-	void update();
-	double getGlobalCycles();
-	void updateMC();
-	double getGlobalMCycles();
+	void handleTimers(int allCycles);
 
 private:
+	Memory& memory;
 
+	void fetchTac();
 
 };
 #endif

@@ -43,40 +43,63 @@ TAC (0xFF07): Timer Control, it has the following structure:
 //953.674316406 nanosecond wait period per machine cycle 
 
 
-double globalCycles{};
-double globalMCycles{};
 
-Clock::Clock(Memory& memory) // 1 machine cycle = 4 clock cycles (t)
+Clock::Clock(Memory& memory) : memory(memory) // 1 machine cycle = 4 clock cycles (t)
 {
 	// basically we want to advance clock cycles, and then see what we should do
 }
 
-void Clock::increment(int& cycleDelay) 
+void Clock::resetClock()
 {
-	using namespace std::chrono_literals;
-
-	//const auto start = std::chrono::high_resolution_clock::now();
-	//wait 4,194,304
-	std::this_thread::sleep_for(953ns);
-	cycleDelay++;
 }
 
-void Clock::update()
+int modulo{};
+
+uint8_t Tac{};
+
+void Clock::fetchTac()
 {
-	globalCycles++;
+    Tac = memory.ioFetchTAC();
 }
 
-double Clock::getGlobalCycles()
+int tacModulo()
 {
-	return globalCycles;
+    if (Tac & 0b00)
+    {
+        return 256;
+    }
+    if (Tac & 0b01)
+    {
+        return 4;
+    }
+    if (Tac & 0b10)
+    {
+        return 16;
+    }
+    return 64;
 }
 
-void Clock::updateMC()
+void Clock::handleTimers(int allCycles)
 {
-	globalMCycles++;
+    if ((allCycles % 64) == 0) // this is the DIV timer
+    {
+        memory.ioIncrementDIV();
+    }
+
+    fetchTac();
+
+    if (Tac & 0b100) // if TAC enabled
+    {
+        if ((allCycles % tacModulo()) == 0) // modulo depends on ff06
+        {
+            memory.ioIncrementTIMA();
+
+            if (memory.ioFetchTIMA() == 0x00) // if overflowed
+            {
+                memory.ioWriteTIMA(memory.ioFetchTMA());
+                memory.setInterruptTimer();
+            }
+        }
+    }
 }
 
-double Clock::getGlobalMCycles()
-{
-	return globalMCycles;
-}

@@ -297,7 +297,7 @@ void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
 uint16_t SM83::popStack()
 {
 	uint16_t word  = memory.readWord(reg.SP);
-	//reg.SP += 2;
+	reg.SP += 2;
 	return word;
 }
 
@@ -1327,7 +1327,7 @@ void SM83::execute(uint8_t opcode)
 
 	}break;
 	case 0x01: { // load into bc, n16
-		reg.BC = memory.readWord(reg.PC);
+		reg.BC = memory.readWord(reg.PC); reg.PC+=2;
 	}break;
 	case 0x02: { // write into address BC, A
 		memory.write(reg.BC, reg.A);
@@ -1349,7 +1349,7 @@ void SM83::execute(uint8_t opcode)
 		rlc(reg.A);
 	}break;
 	case 0x08: { // load [a16] , SP
-		uint16_t wordAdr = memory.readWord(reg.PC);
+		uint16_t wordAdr = memory.readWord(reg.PC); reg.PC+=2;
 		memory.write(wordAdr, (reg.SP) & 0xFF);
 		memory.write(wordAdr+1, (reg.SP>>8) & 0xFF);
 	}break;
@@ -1379,10 +1379,14 @@ void SM83::execute(uint8_t opcode)
 
 	case 0x10: { // STOP, this is a funny one TODO: look into this in pandocs
 		//i think we take in another byte ?
+		//make it so as long as stop mode is on, div timer cant increment and is reset to 0
+		memory.write(0xFF04, 0);
+
 		memory.read(reg.PC); reg.PC++;
+
 	}break;
 	case 0x11: { // load into bc, n16
-		reg.DE = memory.readWord(reg.PC);
+		reg.DE = memory.readWord(reg.PC); reg.PC+=2;
 	}break;
 	case 0x12: { // write into address BC, A
 		memory.write(reg.DE, reg.A);
@@ -1443,7 +1447,7 @@ void SM83::execute(uint8_t opcode)
 		//std::cout << "offset is " << (int)offset << " with pc now equal to " << int(reg.PC) << std::endl;
 	}break;
 	case 0x21: { // load into bc, n16
-		reg.HL = memory.readWord(reg.PC);
+		reg.HL = memory.readWord(reg.PC); reg.PC+=2;
 	}break;
 	case 0x22: { // write into address BC, A
 		memory.write(reg.HL, reg.A);
@@ -1548,7 +1552,7 @@ void SM83::execute(uint8_t opcode)
 		}
 	}break;
 	case 0x31: { // load into bc, n16
-		reg.SP = memory.readWord(reg.PC);
+		reg.SP = memory.readWord(reg.PC); reg.PC+=2;
 	}break;
 	case 0x32: { // write into address BC, A
 		memory.write(reg.HL, reg.A);
@@ -2039,7 +2043,7 @@ void SM83::execute(uint8_t opcode)
 		reg.BC = popStack();
 	} break;
 	case 0xC2: {
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		if (!isZeroFlag())
 		{
 			addCycle();
@@ -2047,11 +2051,11 @@ void SM83::execute(uint8_t opcode)
 		}
 	} break;
 	case 0xC3: {
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		reg.PC = addr;
 	} break;
 	case 0xC4: {//call nz a16
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		if (!isZeroFlag())
 		{
 			addCycle(3);
@@ -2079,7 +2083,7 @@ void SM83::execute(uint8_t opcode)
 		reg.PC = popStack();
 	} break;
 	case 0xCA: {
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		if (isZeroFlag())
 		{
 			addCycle();
@@ -2095,7 +2099,7 @@ void SM83::execute(uint8_t opcode)
 		executePrefix(opcodeCB);
 	} break;
 	case 0xCC: {
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		if (isZeroFlag())
 		{
 			addCycle(3);
@@ -2103,7 +2107,7 @@ void SM83::execute(uint8_t opcode)
 		}
 	} break;
 	case 0xCD: { // call n16 THIS MIGHT BE BREAKING BOOT
-		uint16_t jumpAddr = memory.readWord(reg.PC);
+		uint16_t jumpAddr = memory.readWord(reg.PC); reg.PC+=2;
 		call(jumpAddr);
 	} break;
 	case 0xCE: {
@@ -2126,7 +2130,7 @@ void SM83::execute(uint8_t opcode)
 		reg.DE = popStack();
 	} break;
 	case 0xD2: {
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		if (!isCarryFlag())
 		{
 			addCycle();
@@ -2137,7 +2141,7 @@ void SM83::execute(uint8_t opcode)
 	
 	} break;
 	case 0xD4: {//call nc a16
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		if (!isCarryFlag())
 		{
 			addCycle(3);
@@ -2166,7 +2170,7 @@ void SM83::execute(uint8_t opcode)
 		IME = true;
 	} break;
 	case 0xDA: {
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		if (isCarryFlag())
 		{
 			addCycle(1);
@@ -2176,7 +2180,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xDB: { //empty
 	} break;
 	case 0xDC: {
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		if (isCarryFlag())
 		{
 			addCycle(3);
@@ -2227,7 +2231,7 @@ void SM83::execute(uint8_t opcode)
 		reg.PC = reg.HL;
 	} break;
 	case 0xEA: { // load to a16
-		uint16_t addr = memory.readWord(reg.PC);
+		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
 		memory.write(addr, reg.A);
 	} break;
 	case 0xEB: { //empty
@@ -2276,7 +2280,7 @@ void SM83::execute(uint8_t opcode)
 		reg.SP = reg.HL;
 	} break;
 	case 0xFA: { // load into a , [16]
-		uint16_t tempAddr = memory.readWord(reg.PC);
+		uint16_t tempAddr = memory.readWord(reg.PC); reg.PC+=2;
 		reg.A = memory.read(tempAddr);
 	} break;
 	case 0xFB: { //empty
@@ -2354,30 +2358,35 @@ void SM83::handleInterrupts()
 		memory.write(0xFF0F, (IF &= 0b11111110));
 		IME = false;
 		call(0x0040);
+		addCycle(5);
 	}
 	if (IF & 0b10 && IE & 0b10) //bit1 LCDstat
 	{
 		memory.write(0xFF0F, (IF &= 0b11111101));
 		IME = false;
 		call(0x0048);
+		addCycle(5);
 	}
 	if (IF & 0b100 && IE & 0b100) //bit2 Timer
 	{
 		memory.write(0xFF0F, (IF &= 0b11111011));
 		IME = false;
 		call(0x0050);
+		addCycle(5);
 	}
 	if (IF & 0b1000 && IE & 0b1000) //bit3 Serial
 	{
 		memory.write(0xFF0F, (IF &= 0b11110111));
 		IME = false;
 		call(0x0058);
+		addCycle(5);
 	}
 	if (IF & 0b10000 && IE & 0b10000) //bit4 Joypad
 	{
 		memory.write(0xFF0F, (IF &= 0b11101111));
 		IME = false;
 		call(0x0060);
+		addCycle(5);
 	}
 
 	// mabye do this : addCycle(5);
@@ -2400,15 +2409,9 @@ uint8_t SM83::executeInstruction()
 
 void SM83::executeCycle(double cyclesAvailable)
 {
-	cycles += executeInstruction();
-	
-
-
-	//cycles = opcodeCycles[opcode]; // i think the fetch adds another 4 on top
-//handleInterrupts();
-
-//std::cout << std::hex << (int)opcode << " at PC : " << std::hex <<(int)reg.PC-1<<" | here are reg: " << std::hex << (int)reg.F<< '\n';
-//std::cout << "Current Stack Item" << (int)memory.view(reg.SP + 1) << (int)memory.view(reg.SP) << '\n';
-
+	while (cycles < cyclesAvailable)
+	{
+		cycles += executeInstruction();
+	}
 
 }
