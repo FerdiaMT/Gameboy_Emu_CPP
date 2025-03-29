@@ -1,5 +1,5 @@
-#ifndef PPU_H
-#define PPU_H
+#ifndef CLOCK_H
+#define CLOCK_H
 
 #include <cstdint>
 #include "Memory.h"
@@ -9,6 +9,14 @@ class Clock
 public:
 	Clock(Memory& memory);
 	void resetClock();
+	void increment(int& cycleDelay);
+
+
+	void update();
+	double getGlobalCycles();
+	void updateMC();
+	double getGlobalMCycles();
+
 private:
 
 

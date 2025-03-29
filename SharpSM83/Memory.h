@@ -23,8 +23,9 @@ public:
 	uint8_t cartRam[0x2000]{};
 
 	Memory();
-	uint8_t read(uint16_t& address);
-	uint8_t view(uint16_t address);
+
+	uint8_t read(uint16_t address);
+	uint8_t view(uint16_t address); // phase this out
 	uint16_t readWord(uint16_t& address);
 	uint16_t viewWord(uint16_t address);
 	void writeWord(uint16_t address, uint16_t data);

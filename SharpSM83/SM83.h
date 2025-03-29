@@ -56,7 +56,8 @@ class SM83 {
 public:
 	SM83(Memory& memory);
 	void reset();
-	uint8_t executeCycle();
+	void executeCycle(double cyclesAvailable);
+	uint8_t executeInstruction();
 	void execute(uint8_t opcode);
 	void executePrefix(uint8_t opcode);
 	void handleInterrupts();
@@ -64,6 +65,7 @@ public:
 	bool IME_nextCycle = false;
 	bool isHalted = false;
 	int cycles{};
+	void checkInterruptFlags();
 private:
 
 	Memory& memory;

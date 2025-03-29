@@ -52,7 +52,7 @@ Memory::Memory()
 {
 }
 
-uint8_t Memory::read(uint16_t& address) // adress auto increment
+uint8_t Memory::read(uint16_t address) // adress auto increment
 {
 	//	ANYTHING WITH THE WORDS ROM OR CART SHOULD BE ABSTRACTED AWAY IN THE FUTURE 
 

@@ -67,6 +67,17 @@ uint8_t opcodeCycles[0x100]
 	/////////////////////////////////////////////////////////////
 };
 
+inline void SM83::addCycle()
+{
+	cycles ++;
+}
+
+inline void SM83::addCycle(uint8_t cyclesAdded)
+{
+	cycles += cyclesAdded ;
+}
+
+
 //the following add an extra cycle if a term is met
 /*
 *
@@ -136,15 +147,7 @@ inline bool isCarryFlag()
 	return (reg.F >> 4) & 0b1;
 }
 
-inline void SM83::addCycle()
-{
-	cycles++;
-}
 
-inline void SM83::addCycle(uint8_t cyclesAdded)
-{
-	cycles+=cyclesAdded;
-}
 
 
 void incByte(uint8_t& r8) //INC r8
@@ -2314,23 +2317,98 @@ void SM83::reset()
 	reg.DE = 0;
 	reg.HL = 0;
 	IME = 0;
-	memory.reset();
 }
 
 void SM83::handleInterrupts()
 {
+	if (!IME) return; // check is interrupt requested
+	uint8_t IF = memory.read(0xFF0F);
+	if (!IF)return;
+	uint8_t IE = memory.read(0xFF0F);
+	if (!IE)return;
 	
+	//IF ~ Interrupt Flag, 
+	//IE ~ Interrupt Enable
+
+
+	//interruptsd are checked before fetching new instruction
+	// if any IF flag and corresponding IE flag are both 1
+	// and IME is 1
+	//CPU will push the current PC to the stack
+	//will jump to the corresponding interrupt vector
+	//set IME to 0
+	//flags are only cleared when CPU jumps to interrupt vector
+	//if both called same time, lower bank has priority (vBlank has highest)
+	//takes 20 clocks to dispath interrupt
+	//if cpu is in HALT mode , another 4 clocks are needed
+
+	//so, if we got this far, IME is on
+	//IF and IE have A value
+
+	//can only do one, in which lowest priority first (vBlank)
+
+	if (IF & 0b1 && IE & 0b1) //bit0 vBlank
+	{
+		//the corresponding IF bit and IME flag are reset
+		// 0xFF0F IF address
+		memory.write(0xFF0F, (IF &= 0b11111110));
+		IME = false;
+		call(0x0040);
+	}
+	if (IF & 0b10 && IE & 0b10) //bit1 LCDstat
+	{
+		memory.write(0xFF0F, (IF &= 0b11111101));
+		IME = false;
+		call(0x0048);
+	}
+	if (IF & 0b100 && IE & 0b100) //bit2 Timer
+	{
+		memory.write(0xFF0F, (IF &= 0b11111011));
+		IME = false;
+		call(0x0050);
+	}
+	if (IF & 0b1000 && IE & 0b1000) //bit3 Serial
+	{
+		memory.write(0xFF0F, (IF &= 0b11110111));
+		IME = false;
+		call(0x0058);
+	}
+	if (IF & 0b10000 && IE & 0b10000) //bit4 Joypad
+	{
+		memory.write(0xFF0F, (IF &= 0b11101111));
+		IME = false;
+		call(0x0060);
+	}
+
+	// mabye do this : addCycle(5);
+
+
 }
 
-uint8_t SM83::executeCycle()
+
+
+uint8_t SM83::executeInstruction()
 {
-	uint8_t opcode = memory.read(reg.PC); reg.PC++;
-		//cycles = opcodeCycles[opcode]; // i think the fetch adds another 4 on top
-		//handleInterrupts();
+	handleInterrupts();
 
-	//std::cout << std::hex << (int)opcode << " at PC : " << std::hex <<(int)reg.PC-1<<" | here are reg: " << std::hex << (int)reg.F<< '\n';
-	//std::cout << "Current Stack Item" << (int)memory.view(reg.SP + 1) << (int)memory.view(reg.SP) << '\n';
+	uint8_t opcode = memory.read(reg.PC); //fetch
+	reg.PC++;
 
-	execute(opcode);
+	execute(opcode); // decode - execute
 	return opcodeCycles[opcode];
+}
+
+void SM83::executeCycle(double cyclesAvailable)
+{
+	cycles += executeInstruction();
+	
+
+
+	//cycles = opcodeCycles[opcode]; // i think the fetch adds another 4 on top
+//handleInterrupts();
+
+//std::cout << std::hex << (int)opcode << " at PC : " << std::hex <<(int)reg.PC-1<<" | here are reg: " << std::hex << (int)reg.F<< '\n';
+//std::cout << "Current Stack Item" << (int)memory.view(reg.SP + 1) << (int)memory.view(reg.SP) << '\n';
+
+
 }
