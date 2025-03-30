@@ -247,6 +247,16 @@ uint8_t Memory::ioFetchIF()
 	return io[0x0F];
 }
 
+uint8_t Memory::ioFetchLCDC()
+{
+	return io[0x40];
+}
+
+uint8_t Memory::ioFetchLY()
+{
+	return io[0x44];
+}
+
 void Memory::ioWriteJOYP(uint8_t data)
 {
 	io[0x0] = data;

@@ -11,12 +11,23 @@ public:
 	void resetPPU();
 
 	void executeFrame();
-
+	void executeTick(int allCycles);
 	
 
 private:
 
 	Memory& memory;
+
+	void mode2Tick();
+	void mode3Tick();
+	void mode0Tick();
+	void mode1Tick();
+
+	void fetchTileNo();
+	void fetchTileL();
+	void fetchTileH();
+	void fifoPush();
+
 
 };
 #endif

@@ -137,8 +137,6 @@ int main()
 {
 	Memory memory;
 
-    
-
 	SM83 cpu(memory);
 
     PPU ppu(memory);
@@ -215,9 +213,10 @@ int main()
 
         ///////////////////////////////////////////////
 
+        ppu.executeTick(allCycles);
+
         if (renderFrame)
         {
-            ppu.executeFrame();
             drawAllPixels(memory);
         }
         while (SDL_PollEvent(&event))

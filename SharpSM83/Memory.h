@@ -10,12 +10,7 @@ public:
 
 	//might do it this way, not finalized yet
 
-	//should move these later but im gonna keep them here (cartidge file)
 
-
-	uint8_t rom[0x4000]{};
-	uint8_t romBank[0x4000]{};
-	uint8_t cartRam[0x2000]{};
 
 	Memory();
 
@@ -35,6 +30,9 @@ public:
 	uint8_t ioFetchTMA();
 	uint8_t ioFetchTAC();
 	uint8_t ioFetchIF();
+	uint8_t ioFetchLCDC();
+
+	uint8_t ioFetchLY();
 
 	void ioWriteJOYP(uint8_t data);
 	void ioWriteSB(uint8_t data);
@@ -62,6 +60,13 @@ private:
 	uint8_t oam[0xA0]{};	// object attribute memory, for sprites
 	uint8_t io[0x80]{}; //<for cpu commands
 	uint8_t hram[0x7F]{}; //higher ram
+
+	//should move these later but im gonna keep them here (cartidge file)
+
+
+	uint8_t rom[0x4000]{};
+	uint8_t romBank[0x4000]{};
+	uint8_t cartRam[0x2000]{};
 
 };
 #endif

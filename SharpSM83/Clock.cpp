@@ -42,8 +42,6 @@ TAC (0xFF07): Timer Control, it has the following structure:
 
 //953.674316406 nanosecond wait period per machine cycle 
 
-
-
 Clock::Clock(Memory& memory) : memory(memory) // 1 machine cycle = 4 clock cycles (t)
 {
 	// basically we want to advance clock cycles, and then see what we should do
