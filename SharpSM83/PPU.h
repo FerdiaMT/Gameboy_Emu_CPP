@@ -9,8 +9,14 @@ class PPU
 public:
 	PPU(Memory& memory);
 	void resetPPU();
+
+	void executeFrame();
+
+	
+
 private:
 
+	Memory& memory;
 
 };
 #endif

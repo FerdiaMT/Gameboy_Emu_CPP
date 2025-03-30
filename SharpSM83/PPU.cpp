@@ -160,7 +160,7 @@
 * Mode 3 ~ Sends pixels to the lcd , cant acess anything
 * Mode 0 ~ Waits until the end of the scanline 
 */
-uint16_t Mem{};
+
 
 /*
 	stat summary => 
@@ -192,6 +192,8 @@ uint16_t Mem{};
 	0xFF4D ~ prepare speed switch
 */
 
+uint16_t Mem{}; //<- not sure why i added this, may delete later 
+
 #define LCDC 0xFF40;
 #define STAT 0xFF41; // lcd status
 #define	SCY  0xFF42; // screen y 
@@ -205,7 +207,7 @@ uint16_t Mem{};
 #define WY   0xFF4A; // window x 
 #define WX   0xFF4B; // window y 
 
-PPU::PPU(Memory& memory) //m cycle (using this) = 4 t states
+PPU::PPU(Memory& memory) : memory(memory) //m cycle (using this) = 4 t states
 {
 
 }
@@ -214,3 +216,16 @@ void PPU::resetPPU()
 {
 
 }
+
+uint8_t screen[160][144];
+
+void PPU::executeFrame()
+{
+	//MODE 2 ~ OAM scan
+	// search for OBJS which overlap this line
+	
+	//MODE 3 ~ one pixel per dot from left to right, up to down
+}
+
+// so basically, we will be told the current amount of frames 
+// 70224 ticks or 17556 frames 

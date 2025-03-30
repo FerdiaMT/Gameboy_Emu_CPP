@@ -169,6 +169,7 @@ int main()
 
     auto lastCycleTime = std::chrono::high_resolution_clock::now();
 
+    bool renderFrame = false;
 
     while(running)
     {
@@ -183,7 +184,7 @@ int main()
             // so cycles should currently be on 17573.5294118
             //if not, wait that amount
             int waitCycle = allCycles - 17573;
-
+            renderFrame = true;
 
             if (waitCycle > 0)
             {
@@ -191,6 +192,7 @@ int main()
                 //for each cycle too fast, wait 952ns
                 auto wait = (waitCycle) * 952ns;
                 std::this_thread::sleep_for(wait);
+                
                 //std::cout << 17573 << std::endl;
             }
             else {
@@ -213,6 +215,11 @@ int main()
 
         ///////////////////////////////////////////////
 
+        if (renderFrame)
+        {
+            ppu.executeFrame();
+            drawAllPixels(memory);
+        }
         while (SDL_PollEvent(&event))
         {
             memset(keyboardState, 0, sizeof(keyboardState));
