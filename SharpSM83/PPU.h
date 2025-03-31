@@ -10,9 +10,11 @@ public:
 	PPU(Memory& memory);
 	void resetPPU();
 
-	void executeFrame();
 	void executeTick(int allCycles);
+
+	void updateScreenBuffer(uint8_t(&mainScreen)[160][144]);
 	
+	void writeIntoSTAT(uint8_t x );
 
 private:
 
@@ -27,6 +29,11 @@ private:
 	void fetchTileL();
 	void fetchTileH();
 	void fifoPush();
+	void shiftPixel();
+	uint8_t mergeWithSprite(uint8_t bgPixel, int pixelsX);
+	uint8_t getSpritePixel(int spriteIndex, int spritePixelX);
+	uint16_t fetchTileData(uint8_t tileIndex);
+	void drawPixel(uint8_t finalPixel);
 
 
 };

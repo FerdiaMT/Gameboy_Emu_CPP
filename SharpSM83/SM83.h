@@ -61,7 +61,7 @@ public:
 	void execute(uint8_t opcode);
 	void executePrefix(uint8_t opcode);
 	void handleInterrupts();
-	bool IME= false; // interrupt system
+	bool IME = false; // interrupt system
 	bool IME_nextCycle = false;
 	bool isHalted = false;
 	int cycles{};

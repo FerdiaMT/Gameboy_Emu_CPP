@@ -1,5 +1,8 @@
 #include "Memory.h"
+#include "SM83.h"
 #include <stdio.h>
+#include <iostream>
+
 
 #define ROM_LB 0x0000
 #define ROM_UB 0x3FFF
@@ -56,11 +59,76 @@ MAINTENANCE REQUIRED : REMOVE THE VIEW AND VIEWWORD FUNCTIONS
 * 0xFF00 - 0xFF7F	~	IO //DMA INSIDE HERE 
 * 0xFF80 - 0xFFFE	~ HIGH ram
 */
-Memory::Memory()
+Memory::Memory() {};
+uint8_t Memory::read(uint16_t address) // adress auto increment
 {
+	//	ANYTHING WITH THE WORDS ROM OR CART SHOULD BE ABSTRACTED AWAY IN THE FUTURE 
+
+	if (address <= ROM_UB)
+	{
+		return rom[address];
+	}
+	else if (address <= ROMBANK_UB)
+	{
+		return romBank[address - ROMBANK_LB];
+	}
+	else if (address <= VRAM_UB)
+	{
+		if (vramLocked)
+		{
+			return 0xFF;
+		}
+		else
+		{
+			return vram[address - VRAM_LB];
+		}
+	}
+	else if (address <= CARTRAM_UB)
+	{
+		return cartRam[address - CARTRAM_LB];
+	}
+	else if (address <= WRAM_UB)
+	{
+		return wram[address - WRAM_LB];
+	}
+	else if (address <= OAM_UB)
+	{
+		if (vramLocked) return 0xFF;
+		if (-1/*OAM_DMA_ACTIVE*/)
+		{
+			return 0xFF; // return junk if OAM DMA is currenlty active
+		}
+		else 
+		{
+			uint8_t temp = oam[address - OAM_LB];
+			address++;
+			return temp;
+		}
+	}
+	else if (address <= IO_UB) // i should have no return
+	{
+
+		if (address == 0xFF46)
+		{
+			0x00;
+		}
+		else {
+			return io[address - IO_LB];
+		}
+		
+	}
+	else if (address <= HR_UB)
+	{
+		return hram[address - HR_LB];
+	}
+	else
+	{
+		//something went really wrong if it gets to here
+		return 0;
+	}
 }
 
-uint8_t Memory::read(uint16_t address) // adress auto increment
+uint8_t Memory::readPPU(uint16_t address) // adress auto increment
 {
 	//	ANYTHING WITH THE WORDS ROM OR CART SHOULD BE ABSTRACTED AWAY IN THE FUTURE 
 
@@ -86,11 +154,12 @@ uint8_t Memory::read(uint16_t address) // adress auto increment
 	}
 	else if (address <= OAM_UB)
 	{
+		if (vramLocked) return 0xFF;
 		if (-1/*OAM_DMA_ACTIVE*/)
 		{
 			return 0xFF; // return junk if OAM DMA is currenlty active
 		}
-		else 
+		else
 		{
 			uint8_t temp = oam[address - OAM_LB];
 			address++;
@@ -102,13 +171,12 @@ uint8_t Memory::read(uint16_t address) // adress auto increment
 
 		if (address == 0xFF46)
 		{
-//			dmaTransfer();
-			return -1;
+			0x00;
 		}
 		else {
 			return io[address - IO_LB];
 		}
-		
+
 	}
 	else if (address <= HR_UB)
 	{
@@ -126,27 +194,95 @@ uint16_t Memory::readWord(uint16_t address)
 	uint16_t low = read(address);
 	address++;
 	uint16_t high = read(address);
-	address++;
 	return (high << 8) | low;
 }
 
 
 uint8_t Memory::view(uint16_t address) // remove this later
 {
-	uint8_t temp{};// = ram[address];
-	return temp;
+	return read(address);
 }
 
 uint16_t Memory::viewWord(uint16_t address) // same ghere
 {
-	uint16_t low = {};// ram[address];
-	address++;
-	uint16_t high = {};//ram[address];
-	return (high << 8) | low;
+	return readWord(address);
 }
 
 
 void Memory::write(uint16_t address, uint8_t data)
+{
+
+	if (address <= ROM_UB)
+	{
+		rom[address] = data;
+	}
+	else if (address <= ROMBANK_UB)
+	{
+		romBank[address - ROMBANK_LB] = data;
+	}
+	else if (address <= VRAM_UB)
+	{
+		if (vramLocked)
+		{
+			
+			return;
+		}
+		if ((int)data > 0)
+		{
+		}
+		
+		vram[address - VRAM_LB] = data;
+	}
+	else if (address <= CARTRAM_UB)
+	{
+		cartRam[address - CARTRAM_LB] = data;
+	}
+	else if (address <= WRAM_UB)
+	{
+		wram[address - WRAM_LB] = data;
+	}
+	else if (address <= OAM_UB)
+	{
+		if (vramLocked) return;
+
+		oam[address - OAM_LB] = data;
+
+	}
+	else if (address <= IO_UB) // i should have no return
+	{
+		if (address == 0xFF46) //OAM DMA START
+		{
+			//writing here starts transfer of rom to oam
+			//supposed to take 160 machine cycles ? how do i do this
+			dmaPending = true;
+
+			//Source:      $XX00 - $XX9F;XX = $00 to $DF
+			//Destination : $FE00 - $FE9F
+			uint16_t endAddr = 0xFE00;
+			for (uint16_t i = (data << 2); i <= ((data << 2) | 0x9F); i++) // from source start to source end
+			{
+				write(endAddr, read(i));
+				endAddr++;
+			}
+
+			
+		}
+
+		io[address - IO_LB] = data;
+
+	}
+	else if (address <= HR_UB)
+	{
+		hram[address - HR_LB] = data;
+	}
+	else
+	{
+		//something went really wrong if it gets to here
+	}
+
+}
+
+void Memory::writePPU(uint16_t address, uint8_t data)
 {
 
 	if (address <= ROM_UB)
@@ -171,12 +307,30 @@ void Memory::write(uint16_t address, uint8_t data)
 	}
 	else if (address <= OAM_UB)
 	{
+		if (vramLocked) return;
 
 		oam[address - OAM_LB] = data;
 
 	}
 	else if (address <= IO_UB) // i should have no return
 	{
+		if (address == 0xFF46) //OAM DMA START
+		{
+			//writing here starts transfer of rom to oam
+			//supposed to take 160 machine cycles ? how do i do this
+			dmaPending = true;
+
+			//Source:      $XX00 - $XX9F;XX = $00 to $DF
+			//Destination : $FE00 - $FE9F
+			uint16_t endAddr = 0xFE00;
+			for (uint16_t i = (data << 2); i <= ((data << 2) | 0x9F); i++) // from source start to source end
+			{
+				write(endAddr, read(i));
+				endAddr++;
+			}
+
+
+		}
 
 		io[address - IO_LB] = data;
 
@@ -195,7 +349,7 @@ void Memory::write(uint16_t address, uint8_t data)
 void Memory::writeWord(uint16_t address, uint16_t data)
 {
 	write(address,(data & 0xFF));
-	write(address, (data >> 8) & 0x00FF);
+	write(address+1, (data >> 8) & 0x00FF);
 }
 
 
@@ -331,4 +485,6 @@ void Memory::setInterruptJoypad()
 {
 	io[0x0F] |= 0b10000;
 }
+
+
 

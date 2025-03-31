@@ -6,20 +6,19 @@ class Memory
 {
 public:
 
-
-
-	//might do it this way, not finalized yet
-
-
-
 	Memory();
 
 	uint8_t read(uint16_t address);
 	uint8_t view(uint16_t address); // phase this out
+
+	uint8_t readPPU(uint16_t address);
+
+
 	uint16_t readWord(uint16_t address);
 	uint16_t viewWord(uint16_t address);
 	void writeWord(uint16_t address, uint16_t data);
 	void write(uint16_t address, uint8_t data);
+	void writePPU(uint16_t address, uint8_t data);
 	void reset();
 
 	uint8_t ioFetchJOYP();
@@ -52,6 +51,10 @@ public:
 	void setInterruptTimer();
 	void setInterruptSerial();
 	void setInterruptJoypad();
+
+	bool vramLocked = false;
+
+	bool dmaPending = false;
 
 private:
 

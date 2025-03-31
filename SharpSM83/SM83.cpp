@@ -88,7 +88,7 @@ inline void SM83::addCycle(uint8_t cyclesAdded)
 * 
 */
 
-SM83::SM83(Memory& memory) : memory(memory){};
+SM83::SM83(Memory& memory) : memory(memory) {};
 
 inline void clearFlags() { //inline is replace the code directly during compile
 	reg.F = 0;
@@ -281,7 +281,7 @@ void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
 	{
 		setCarryFlag();
 	}
-	if (r8Val == 0)
+	if (r8a == r8b)
 	{
 		setZeroFlag();
 	}
@@ -294,13 +294,6 @@ void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
 
 
 
-uint16_t SM83::popStack()
-{
-	uint16_t word  = memory.readWord(reg.SP);
-	reg.SP += 2;
-	return word;
-}
-
 void SM83::call(uint16_t jumpAddr)
 {
 	reg.SP -= 2;//minus two bytes for word
@@ -312,7 +305,12 @@ void SM83::push(uint16_t pushData)
 	reg.SP-=2;
 	memory.writeWord(reg.SP, pushData);
 }
-
+uint16_t SM83::popStack()
+{
+	uint16_t word = memory.readWord(reg.SP);
+	reg.SP += 2;
+	return word;
+}
 
 void rlc(uint8_t& r8) // rotate left, r8  just bitshifted no other change
 {
@@ -2271,13 +2269,18 @@ void SM83::execute(uint8_t opcode)
 	//====0xF?===============================================================
 
 	case 0xF0: { // LDH  a [a8]
-		reg.A = memory.read(reg.PC); reg.PC++;
+		uint8_t offset = memory.read(reg.PC++);
+		uint16_t io_addr = 0xFF00 + offset;
+		reg.A = memory.read(io_addr); 
+		//std::cout << (int)reg.A << std::endl;
 	} break;
 	case 0xF1: {
 		reg.AF = popStack();
 	} break;
 	case 0xF2: {
-		reg.C = memory.read(reg.PC);  reg.PC++;
+		uint8_t offset = memory.read(reg.C);
+		uint16_t io_addr = 0xFF00 + offset;
+		reg.A = memory.read(io_addr);
 	} break;
 	case 0xF3: { // DI (what does this mean)
 		IME = false;
@@ -2312,7 +2315,8 @@ void SM83::execute(uint8_t opcode)
 	case 0xFD: { // empty
 	} break;
 	case 0xFE: {
-		compareByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
+		uint8_t operand = memory.read(reg.PC++); // for debugging,since i think this is broken
+		compareByteReg(reg.A, operand);
 	} break;
 	case 0xFF: {
 		call(0x38);
@@ -2346,7 +2350,10 @@ void SM83::reset()
 
 void SM83::handleInterrupts()
 {
-	if (!IME) return; // check is interrupt requested
+	if (!IME)
+	{
+		return; // check is interrupt requested
+	}
 	uint8_t IF = memory.ioFetchIF();
 	if (!IF)return;
 	uint8_t IE = memory.read(0xFF0F);
@@ -2372,6 +2379,7 @@ void SM83::handleInterrupts()
 
 	//can only do one, in which lowest priority first (vBlank)
 
+	//std::cout<< (int)IF<<std::endl;
 	if (IF & 0b1 && IE & 0b1) //bit0 vBlank
 	{
 		//the corresponding IF bit and IME flag are reset
@@ -2380,6 +2388,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0040);
 		addCycle(5);
+		std::cout << "VBLANK INTERRUPT ======================================" << std::endl;
 	}
 	if (IF & 0b10 && IE & 0b10) //bit1 LCDstat
 	{
@@ -2387,6 +2396,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0048);
 		addCycle(5);
+		std::cout << "LCD INTERRUPT ======================================" << std::endl;
 	}
 	if (IF & 0b100 && IE & 0b100) //bit2 Timer
 	{
@@ -2394,6 +2404,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0050);
 		addCycle(5);
+		std::cout << "TIMER INTERRUPT ======================================" << std::endl;
 	}
 	if (IF & 0b1000 && IE & 0b1000) //bit3 Serial
 	{
@@ -2411,8 +2422,6 @@ void SM83::handleInterrupts()
 	}
 
 	// mabye do this : addCycle(5);
-
-
 }
 
 
@@ -2422,10 +2431,29 @@ uint8_t SM83::executeInstruction()
 	handleInterrupts();
 
 	uint8_t opcode = memory.read(reg.PC); //fetch
+
+
+	//std::cout << std::hex << (int)opcode << "   $" << std::hex << (int)reg.PC;
+
 	reg.PC++;
 
 	execute(opcode); // decode - execute
-	//std::cout << std::hex <<(int)opcode << std::endl;
+	
+	//std::cout <<  " ,   : REGB" << (int)reg.B << std::endl;
+
+	//std::cout << "LY: " << (int)memory.read(0xFF44) << std::endl;
+	//for (int i = 0; i < 64; i++) {
+	//	std::cout << std::hex << (int)memory.read(0x8000 + i);
+	//}
+
+	//memory.write(0x8001, 0xFF);
+
+//	std::cout << std::hex << (int)memory.read(0x8001) << std::endl;
+
+	//std::cout<< std::endl;
+
+
+
 	return opcodeCycles[opcode];
 }
 
@@ -2433,7 +2461,16 @@ void SM83::executeCycle(double cyclesAvailable)
 {
 	while (cycles < cyclesAvailable)
 	{
-		cycles += executeInstruction();
+		if (memory.dmaPending) {
+			cycles += 160;
+			memory.dmaPending = false;
+		}
+		else
+		{
+			cycles += executeInstruction();
+		}
+		
 	}
 
 }
+

@@ -24,8 +24,16 @@ const int HEIGHT = 144;
 const int SCALE = 5;
 
 
-uint8_t pixelState[WIDTH][HEIGHT]{}; // for now this can be 0,1,2,3,4
+uint8_t pixelState[160][144]{}; // for now this can be 0,1,2,3,4
 bool keyboardState[16]{};
+
+/*
+Todo:
+
+    OAM transfer 
+    STAT reg
+    replace view with read in cpu
+*/
 
 void setupSDL()
 {
@@ -64,24 +72,24 @@ void drawAllPixels(Memory& memory)
         for (int y = 0; y < HEIGHT; y++)
         {
             int c{};
-            switch (pixelState[x][y]) // each of these can be either 0,1,2 or 3 (0 - white, 1 - 33%, 2 - 66%, 3 = 100%)
+            switch (pixelState[x][y]) // each of these can be either 0,1,2 or 3 (11 - white, 10 - 33%, 01 - 66%, 00 = 100%)
             {
-            case(0): {
+            case(3): {
                 c = 255;
             }break;
-            case(1): {
+            case(2): {
                 c = 170;
             }break;
-            case(2): {
+            case(1): {
                 c = 85;
             }break;
-            case(3): {
+            case(0): {
                 c = 0; // black
             }break;
 
             }
             
-            SDL_SetRenderDrawColor(renderer, 0, c,0, 255);
+            SDL_SetRenderDrawColor(renderer, c, c,c, 255);
             SDL_FRect pixel = { x * SCALE, y * SCALE, SCALE, SCALE };//x,y,w,h
             SDL_RenderFillRect(renderer, &pixel);
         }
@@ -148,15 +156,32 @@ int main()
     ppu.resetPPU();
     clock.resetClock();
 
-    for (uint16_t i = 0; i < 256; i++) {
-        memory.write(i, bootROM[i]);
+   
+
+    //for (uint16_t i = 0; i < 256; i++) {
+    //    memory.write(i, bootROM[i]);
+    //}
+
+    //for (uint16_t i = 0x104; i < 0x133; i++)
+    //{
+    //    memory.write(i, cartROM[i-0x104]);
+
+    //}
+    uint8_t checkerboard[16] = {
+        0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55,  // 2BPP data
+        0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55
+    };
+
+    for (int i = 0; i < 16; i++) {
+        memory.write(0x8000 + i, checkerboard[i]);
     }
 
-    for (uint16_t i = 0x104; i < 0x133; i++)
-    {
-        memory.write(i, cartROM[i-0x104]);
-
+    for (int i = 0x9800; i < 0x9A00; i++) {
+        memory.write(i, 0x00);
     }
+
+    memory.write(0xFF40, 0b10000001);
+
 
     setupSDL();
     SDL_Event event;
@@ -175,14 +200,15 @@ int main()
         auto currentTime = std::chrono::high_resolution_clock::now();
         float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
         
-
         if (dt >= 16.73) // once every 60 seconds (16.73 milliseconds)
         {
+
+
+
             // a machine cycle takes 0.000952 milliseconds
             // so cycles should currently be on 17573.5294118
             //if not, wait that amount
             int waitCycle = allCycles - 17573;
-            renderFrame = true;
 
             if (waitCycle > 0)
             {
@@ -197,6 +223,8 @@ int main()
                // std::cout << allCycles << std::endl;
             }
 
+            ppu.updateScreenBuffer(pixelState);
+            drawAllPixels(memory);
            
             lastCycleTime = currentTime;
             allCycles = 0;
@@ -215,10 +243,9 @@ int main()
 
         ppu.executeTick(allCycles);
 
-        if (renderFrame)
-        {
-            drawAllPixels(memory);
-        }
+
+
+
         while (SDL_PollEvent(&event))
         {
             memset(keyboardState, 0, sizeof(keyboardState));
@@ -237,16 +264,5 @@ int main()
     SDL_DestroyWindow(window);
     SDL_Quit();
 
-
 	return 0;
 }
-
-// so what i could do to solve this timer problem
-//let the while loop run, each time adding 1 to my currentCycle
-//each time query cpu, seeing if the next opcode has enough machine cycles to execute
-//each m cycle do the clock stuff
-//keep a REAL time, as in time to execute program.
-// every thousand cycles or so check the amount of cycles have executed
-// (mabye every 1/60th of a second would work nice)
-// then calculate how long it should of taken to execute those cycles
-// then just sleep the main loop for that difference of time
