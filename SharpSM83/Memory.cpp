@@ -227,9 +227,6 @@ void Memory::write(uint16_t address, uint8_t data)
 			
 			return;
 		}
-		if ((int)data > 0)
-		{
-		}
 		
 		vram[address - VRAM_LB] = data;
 	}
@@ -250,6 +247,13 @@ void Memory::write(uint16_t address, uint8_t data)
 	}
 	else if (address <= IO_UB) // i should have no return
 	{
+
+
+		if (address == 0xFF02 && data == 0x81) {
+			char c = read(0xFF01);
+			std::cout << c; 
+		}
+
 		if (address == 0xFF46) //OAM DMA START
 		{
 			//writing here starts transfer of rom to oam

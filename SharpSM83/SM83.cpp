@@ -88,6 +88,20 @@ inline void SM83::addCycle(uint8_t cyclesAdded)
 * 
 */
 
+void SM83::debugRegs()
+{
+	reg.A = 0x01;
+	reg.F = 0xB0;
+	reg.B = 0x00;
+	reg.C = 0x13;
+	reg.D = 0x00;
+	reg.E = 0xD8;
+	reg.H = 0x01;
+	reg.L = 0x4D;
+	reg.SP = 0xFFFE;
+	reg.PC = 0x0100; 
+}
+
 SM83::SM83(Memory& memory) : memory(memory) {};
 
 inline void clearFlags() { //inline is replace the code directly during compile
@@ -229,7 +243,7 @@ void subByteReg(uint8_t& r8a , uint8_t r8b)
 {
 	clearFlags();
 	setNegFlag(); 
-	if (r8b > r8a) setCarryFlag(); 
+	if (r8a < r8b) setCarryFlag();
 	if ((r8a & 0x0F) < (r8b & 0x0F)) setHalfFlag();
 	r8a -= r8b;
 	if (r8a == 0) setZeroFlag(); 
@@ -276,7 +290,6 @@ void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
 {//basically only cares about flags
 	clearFlags();
 	setNegFlag();
-	uint8_t r8Val = r8a - r8b;
 	if (r8b > r8a)
 	{
 		setCarryFlag();
@@ -425,7 +438,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x06: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		rlc(a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -452,7 +465,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x0E: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		rrc(a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -480,7 +493,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x16: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		rl(a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -507,7 +520,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x1E: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		rr(a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -536,7 +549,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x26: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		sla(a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -563,7 +576,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x2E: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		sra(a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -592,7 +605,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x36: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		swap(a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -619,7 +632,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x3E: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		srl(a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -648,7 +661,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x46: {// whatever hl is pointing to
 		addCycle();
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		bit(0, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -675,7 +688,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x4E: {// whatever hl is pointing to
 		addCycle();
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		bit(1, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -704,7 +717,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x56: {// whatever hl is pointing to
 		addCycle();
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		bit(2, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -731,7 +744,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x5E: {// whatever hl is pointing to
 		addCycle();
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		bit(3, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -761,7 +774,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x66: {// whatever hl is pointing to
 		addCycle();
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		bit(4, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -788,7 +801,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x6E: {// whatever hl is pointing to
 		addCycle();
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		bit(5, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -818,7 +831,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x76: {// whatever hl is pointing to
 		addCycle();
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		bit(6, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -845,7 +858,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x7E: {// whatever hl is pointing to
 		addCycle();
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		bit(7, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -875,7 +888,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x86: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		res(0, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -902,7 +915,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x8E: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		res(1, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -932,7 +945,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x96: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		res(0, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -959,7 +972,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0x9E: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		res(3, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -988,7 +1001,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xA6: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		res(4, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1015,7 +1028,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xAE: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		res(5, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1045,7 +1058,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xB6: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		res(6, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1072,7 +1085,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xBE: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		res(7, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1102,7 +1115,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xC6: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		set(0, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1129,7 +1142,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xCE: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		set(1, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1159,7 +1172,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xD6: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		set(2, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1186,7 +1199,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xDE: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		set(3, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1216,7 +1229,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xE6: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		set(4, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1243,7 +1256,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xEE: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		set(5, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1273,7 +1286,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xF6: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		set(6, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1300,7 +1313,7 @@ void SM83::executePrefix(uint8_t opcode)
 	} break;
 	case 0xFE: {// whatever hl is pointing to
 		addCycle(2);
-		uint8_t a8 = memory.view(reg.HL);
+		uint8_t a8 = memory.read(reg.HL);
 		set(7, a8);
 		memory.write(reg.HL, a8);
 	} break;
@@ -1355,7 +1368,7 @@ void SM83::execute(uint8_t opcode)
 		addWordReg(reg.HL, reg.BC);
 	}break;
 	case 0x0A: {// load into A, [bc]
-		reg.A = memory.read(reg.BC); reg.BC++;
+		reg.A = memory.read(reg.BC);
 	}break;
 	case 0x0B: {
 		reg.BC--;
@@ -1406,7 +1419,7 @@ void SM83::execute(uint8_t opcode)
 	}break;
 	case 0x18: { // jump to e8
 
-		int8_t offset = memory.read(reg.PC); reg.PC++; // pc = 129
+		int8_t offset = (int8_t)memory.read(reg.PC); reg.PC++; // pc = 129
 		reg.PC += offset;
 
 	}break;
@@ -1414,7 +1427,7 @@ void SM83::execute(uint8_t opcode)
 		addWordReg(reg.HL, reg.DE);
 	}break;
 	case 0x1A: {
-		reg.A = memory.read(reg.DE); reg.DE++;
+		reg.A = memory.read(reg.DE);
 	}break;
 	case 0x1B: {
 		reg.DE--;
@@ -1448,6 +1461,8 @@ void SM83::execute(uint8_t opcode)
 		reg.HL = memory.readWord(reg.PC); reg.PC+=2;
 	}break;
 	case 0x22: { // write into address BC, A
+		//std::cout << "Wrinting " << std::hex << (int)reg.HL << " into " << std::hex << (int)reg.A << std::endl;
+
 		memory.write(reg.HL, reg.A);
 		reg.HL++;
 	}break;
@@ -1541,8 +1556,9 @@ void SM83::execute(uint8_t opcode)
 
 	//====0x3?===================================================
 
-	case 0x30: { // JR Z , e8
-		int8_t offset = memory.read(reg.PC);  reg.PC++; // pc = 129
+	case 0x30: { // JR NC , e8
+		int8_t offset = memory.read(reg.PC);  
+		reg.PC++; // pc = 129
 		if (!isCarryFlag())
 		{
 			addCycle();
@@ -1560,13 +1576,13 @@ void SM83::execute(uint8_t opcode)
 		reg.SP++;
 	}break;
 	case 0x34: { // increment whatever hl is pointing to by 1
-		uint8_t byte = memory.view(reg.HL); // this one wont increment
+		uint8_t byte = memory.read(reg.HL); // this one wont increment
 		incByte(byte);
 		memory.write(reg.HL, byte);
 		//UNSURE IF I SHOULD INCREMENT PROGRAM COUNTER FROM HERE 
 	}break;
 	case 0x35: {
-		uint8_t byte = memory.view(reg.HL); // this one wont increment
+		uint8_t byte = memory.read(reg.HL); // this one wont increment
 		decByte(byte);
 		memory.write(reg.HL, byte);
 	}break;
@@ -1574,10 +1590,10 @@ void SM83::execute(uint8_t opcode)
 		memory.write(reg.HL, memory.read(reg.PC));  reg.PC++;// load into address hl, data held in next pc
 	}break;
 	case 0x37: { // SCF (confusing one)
-		bool z = isZeroFlag;
+		bool z = isZeroFlag();
 		clearFlags();
 		setCarryFlag();
-		if (z) setZeroFlag;
+		if (z) setZeroFlag();
 	}break;
 	case 0x38: { // jump to e8
 
@@ -1593,7 +1609,7 @@ void SM83::execute(uint8_t opcode)
 		addWordReg(reg.HL, reg.SP);
 	}break;
 	case 0x3A: {
-		reg.A = memory.read(reg.HL);  reg.HL++;
+		reg.A = memory.read(reg.HL);
 		reg.HL--;
 	}break;
 	case 0x3B: {
@@ -1638,7 +1654,7 @@ void SM83::execute(uint8_t opcode)
 		reg.B = reg.L;
 	} break;
 	case 0x46: {//hl pointer 
-		reg.B = memory.view(reg.HL);
+		reg.B = memory.read(reg.HL);
 	} break;
 	case 0x47: {
 		reg.B = reg.A;
@@ -1662,7 +1678,7 @@ void SM83::execute(uint8_t opcode)
 		reg.C = reg.L;
 	} break;
 	case 0x4E: {
-		reg.C = memory.view(reg.HL);
+		reg.C = memory.read(reg.HL);
 	} break;
 	case 0x4F: {
 		reg.C = reg.A;
@@ -1689,7 +1705,7 @@ void SM83::execute(uint8_t opcode)
 		reg.D = reg.L;
 	} break;
 	case 0x56: {//hl pointer 
-		reg.D = memory.view(reg.HL);
+		reg.D = memory.read(reg.HL);
 	} break;
 	case 0x57: {
 		reg.D = reg.A;
@@ -1713,7 +1729,7 @@ void SM83::execute(uint8_t opcode)
 		reg.E = reg.L;
 	} break;
 	case 0x5E: {
-		reg.E = memory.view(reg.HL);
+		reg.E = memory.read(reg.HL);
 	} break;
 	case 0x5F: {
 		reg.E = reg.A;
@@ -1740,7 +1756,7 @@ void SM83::execute(uint8_t opcode)
 		reg.H = reg.L;
 	} break;
 	case 0x66: {//hl pointer 
-		reg.H = memory.view(reg.HL);
+		reg.H = memory.read(reg.HL);
 	} break;
 	case 0x67: {
 		reg.H = reg.A;
@@ -1764,7 +1780,7 @@ void SM83::execute(uint8_t opcode)
 		reg.L = reg.L;
 	} break;
 	case 0x6E: {
-		reg.L = memory.view(reg.HL);
+		reg.L = memory.read(reg.HL);
 	} break;
 	case 0x6F: {
 		reg.L = reg.A;
@@ -1837,7 +1853,7 @@ void SM83::execute(uint8_t opcode)
 		reg.A = reg.L;
 	} break;
 	case 0x7E: {
-		reg.A = memory.view(reg.HL);
+		reg.A = memory.read(reg.HL);
 	} break;
 	case 0x7F: {
 		reg.A = reg.A;
@@ -1864,7 +1880,7 @@ void SM83::execute(uint8_t opcode)
 		addByteReg(reg.A, reg.L);
 	} break;
 	case 0x86: {
-		addByteReg(reg.A, memory.view(reg.HL));
+		addByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0x87: {
 		addByteReg(reg.A, reg.A);
@@ -1888,7 +1904,7 @@ void SM83::execute(uint8_t opcode)
 		addCarryByteReg(reg.A, reg.L);
 	} break;
 	case 0x8E: {
-		addCarryByteReg(reg.A, memory.view(reg.HL));
+		addCarryByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0x8F: {
 		addCarryByteReg(reg.A, reg.A);
@@ -1915,7 +1931,7 @@ void SM83::execute(uint8_t opcode)
 		subByteReg(reg.A, reg.L);
 	} break;
 	case 0x96: {
-		subByteReg(reg.A, memory.view(reg.HL));
+		subByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0x97: {
 		subByteReg(reg.A, reg.A);
@@ -1939,7 +1955,7 @@ void SM83::execute(uint8_t opcode)
 		subCarryByteReg(reg.A, reg.L);
 	} break;
 	case 0x9E: {
-		subCarryByteReg(reg.A, memory.view(reg.HL));
+		subCarryByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0x9F: {
 		subCarryByteReg(reg.A, reg.A);
@@ -1966,7 +1982,7 @@ void SM83::execute(uint8_t opcode)
 		andByteReg(reg.A, reg.L);
 	} break;
 	case 0xA6: {
-		andByteReg(reg.A, memory.view(reg.HL));
+		andByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0xA7: {
 		andByteReg(reg.A, reg.A);
@@ -1990,7 +2006,7 @@ void SM83::execute(uint8_t opcode)
 		xorByteReg(reg.A, reg.L);
 	} break;
 	case 0xAE: {
-		xorByteReg(reg.A, memory.view(reg.HL));
+		xorByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0xAF: {
 		xorByteReg(reg.A, reg.A);
@@ -2017,7 +2033,7 @@ void SM83::execute(uint8_t opcode)
 		orByteReg(reg.A, reg.L);
 	} break;
 	case 0xB6: {
-		orByteReg(reg.A, memory.view(reg.HL));
+		orByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0xB7: {
 		orByteReg(reg.A, reg.A);
@@ -2041,12 +2057,12 @@ void SM83::execute(uint8_t opcode)
 		compareByteReg(reg.A, reg.L);
 	} break;
 	case 0xBE: {
-		compareByteReg(reg.A, memory.view(reg.HL));
+		compareByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0xBF: {//these are the same so just set flags here
-		clearFlags();
+		//clearFlags();
 		setZeroFlag();
-		setNegFlag();
+		//setNegFlag();
 	} break;
 
 	//====0xC?======end of repetitive regs====================================================
@@ -2277,9 +2293,8 @@ void SM83::execute(uint8_t opcode)
 	case 0xF1: {
 		reg.AF = popStack();
 	} break;
-	case 0xF2: {
-		uint8_t offset = memory.read(reg.C);
-		uint16_t io_addr = 0xFF00 + offset;
+	case 0xF2: { // this might be wrong
+		uint16_t io_addr = 0xFF00 + reg.C;
 		reg.A = memory.read(io_addr);
 	} break;
 	case 0xF3: { // DI (what does this mean)
@@ -2433,26 +2448,39 @@ uint8_t SM83::executeInstruction()
 	uint8_t opcode = memory.read(reg.PC); //fetch
 
 
-	//std::cout << std::hex << (int)opcode << "   $" << std::hex << (int)reg.PC;
+	//std::cout << std::hex << (int)opcode << "   $" << std::hex << (int)reg.PC << "  ";
 
 	reg.PC++;
 
 	execute(opcode); // decode - execute
 	
-	//std::cout <<  " ,   : REGB" << (int)reg.B << std::endl;
+	//std::cout <<"A : " << (int)reg.A <<"   ";
+	//std::cout <<"BC: " << (int)reg.BC<<"   ";
+	//std::cout <<"DE: " << (int)reg.DE<<"   ";
+	//std::cout <<"HL: " << (int)reg.HL << "   ";
+	//std::cout << std::endl;
+	//std::cout << "8000: " << std::hex << (int)memory.read(0x8000);
+	//std::cout << "  8001: " << std::hex << (int)memory.read(0x8001);
+	//std::cout << "  8002: " << std::hex << (int)memory.read(0x8002);
+	//std::cout << "  8003: " << std::hex << (int)memory.read(0x8003);
+	//std::cout << "  8004: " << std::hex << (int)memory.read(0x8004);
+	//std::cout << "  8005: " << std::hex << (int)memory.read(0x8005);
+	//std::cout << "  8006: " << std::hex << (int)memory.read(0x8006);
+	//std::cout << "  8007: " << std::hex << (int)memory.read(0x8007);
+	//std::cout << "  8008: " << std::hex << (int)memory.read(0x8008);
+	//std::cout << std::endl;
 
+	 
 	//std::cout << "LY: " << (int)memory.read(0xFF44) << std::endl;
-	//for (int i = 0; i < 64; i++) {
-	//	std::cout << std::hex << (int)memory.read(0x8000 + i);
+	//for (int i = 0; i < 20; i++) {
+	//	int a = (int)memory.read(0x8000 + i);
+	//	if (a != 0 && a != 0xFF)
+	//	{
+	//		std::cout << std::hex << a;
+	//	}
 	//}
 
-	//memory.write(0x8001, 0xFF);
-
-//	std::cout << std::hex << (int)memory.read(0x8001) << std::endl;
-
-	//std::cout<< std::endl;
-
-
+	//std::cout << std::endl;
 
 	return opcodeCycles[opcode];
 }
@@ -2468,9 +2496,7 @@ void SM83::executeCycle(double cyclesAvailable)
 		else
 		{
 			cycles += executeInstruction();
-		}
-		
+		}	
 	}
-
 }
 

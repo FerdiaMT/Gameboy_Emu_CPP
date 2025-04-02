@@ -54,6 +54,13 @@ extern registers reg;
 
 class SM83 {
 public:
+
+
+
+
+	void debugRegs();
+
+
 	SM83(Memory& memory);
 	void reset();
 	void executeCycle(double cyclesAvailable);

@@ -2,7 +2,7 @@
 #include "Memory.h"
 #include "PPU.h"
 #include "Clock.h"
-
+#include <fstream>
 
 #include <stdio.h>
 #include <iostream>
@@ -43,7 +43,7 @@ void setupSDL()
         return;
     }
 
-    window = SDL_CreateWindow("Chip8", WIDTH * SCALE, HEIGHT * SCALE, SDL_WINDOW_RESIZABLE);
+    window = SDL_CreateWindow("DMG", WIDTH * SCALE, HEIGHT * SCALE, SDL_WINDOW_RESIZABLE);
     if (!window)
     {
         std::cerr << "Window couldnt be created " << SDL_GetError();
@@ -63,6 +63,9 @@ void setPixelState(Memory& memory) //do this later
 {
 
 }
+
+
+
 
 
 void drawAllPixels(Memory& memory)
@@ -155,8 +158,28 @@ int main()
     memory.reset();
     ppu.resetPPU();
     clock.resetClock();
-
    
+    std::ifstream file("cpu_instrs.gb", std::ios::binary | std::ios::ate);
+
+    bool skipBootROM = true; 
+
+    if (file.is_open())
+    {
+
+        std::streampos size = file.tellg();
+        char* buffer = new char[size];
+
+        file.seekg(0, std::ios::beg);
+        file.read(buffer, size);
+        file.close();
+
+        for (int i = 0; i < size; ++i)
+        {
+            memory.write(i, buffer[i]);
+        }
+        delete[] buffer;
+        std::cout << "done loading memory" << std::endl;
+    }
 
     //for (uint16_t i = 0; i < 256; i++) {
     //    memory.write(i, bootROM[i]);
@@ -164,10 +187,14 @@ int main()
 
     //for (uint16_t i = 0x104; i < 0x133; i++)
     //{
-    //    memory.write(i, cartROM[i-0x104]);
-
+    //    memory.write(i, cartROM[i - 0x104]);
     //}
-    uint8_t checkerboard[16] = {
+
+
+    //baarg test rom
+
+
+   /* uint8_t checkerboard[16] = {
         0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55,  // 2BPP data
         0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55
     };
@@ -180,8 +207,44 @@ int main()
         memory.write(i, 0x00);
     }
 
-    memory.write(0xFF40, 0b10000001);
+    memory.write(0xFF40, 0b10000001);*/
 
+    if (skipBootROM) {
+
+        cpu.debugRegs();
+
+        memory.write(0xFF05, 0x00); 
+        memory.write(0xFF06, 0x00); 
+        memory.write(0xFF07, 0x00); 
+        memory.write(0xFF10, 0x80);
+        memory.write(0xFF11, 0xBF); 
+        memory.write(0xFF12, 0xF3); 
+        memory.write(0xFF14, 0xBF); 
+        memory.write(0xFF16, 0x3F); 
+        memory.write(0xFF17, 0x00); 
+        memory.write(0xFF19, 0xBF);  
+        memory.write(0xFF1A, 0x7F); 
+        memory.write(0xFF1B, 0xFF); 
+        memory.write(0xFF1C, 0x9F);
+        memory.write(0xFF1E, 0xBF); 
+        memory.write(0xFF20, 0xFF);
+        memory.write(0xFF21, 0x00);
+        memory.write(0xFF22, 0x00);
+        memory.write(0xFF23, 0xBF); 
+        memory.write(0xFF24, 0x77);
+        memory.write(0xFF25, 0xF3);
+        memory.write(0xFF26, 0xF1);
+        memory.write(0xFF40, 0x91);
+        memory.write(0xFF42, 0x00);
+        memory.write(0xFF43, 0x00);
+        memory.write(0xFF45, 0x00);
+        memory.write(0xFF47, 0xFC);
+        memory.write(0xFF48, 0xFF);
+        memory.write(0xFF49, 0xFF); 
+        memory.write(0xFF4A, 0x00); 
+        memory.write(0xFF4B, 0x00); 
+        memory.write(0xFF50, 0x01); 
+    }
 
     setupSDL();
     SDL_Event event;
@@ -202,27 +265,14 @@ int main()
         
         if (dt >= 16.73) // once every 60 seconds (16.73 milliseconds)
         {
-
-
-
-            // a machine cycle takes 0.000952 milliseconds
-            // so cycles should currently be on 17573.5294118
-            //if not, wait that amount
             int waitCycle = allCycles - 17573;
-
             if (waitCycle > 0)
             {
                 using namespace std::chrono_literals;
                 //for each cycle too fast, wait 952ns
                 auto wait = (waitCycle) * 952ns;
                 std::this_thread::sleep_for(wait);
-                
-                //std::cout << 17573 << std::endl;
             }
-            else {
-               // std::cout << allCycles << std::endl;
-            }
-
             ppu.updateScreenBuffer(pixelState);
             drawAllPixels(memory);
            
@@ -235,16 +285,9 @@ int main()
 
         cpu.executeCycle(allCycles);
 
-        ///////////////////////////////////Clock stuff
-
         clock.handleTimers(allCycles);
 
-        ///////////////////////////////////////////////
-
         ppu.executeTick(allCycles);
-
-
-
 
         while (SDL_PollEvent(&event))
         {

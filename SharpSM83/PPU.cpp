@@ -94,7 +94,7 @@ void PPU::writeIntoSTAT(uint8_t mode)
 void PPU::mode2Tick() // search for objs on this current line 
 { // each sprite takes up 4 bytes 
 
-	if (spriteBufferPointer >= 40) return;
+	if (spriteBufferPointer > 36) return;
 
 	uint8_t spriteY = memory.readPPU(0xFFE0 + oamSearch);
 
@@ -162,7 +162,7 @@ void PPU::fetchTileNo()
 	// just before we fetched the current lcdc
 	//now check if we are rendering window or bakcground
 	uint16_t startingAddr{};
-	uint8_t wy = memory.readPPU(0xFF4A);
+	uint8_t wy = memory.readPPU(0xFF4A); 
 	uint8_t wx = memory.readPPU(0xFF4B);
 	uint8_t scx = memory.readPPU(0xFF43);
 	uint8_t scy = memory.readPPU(0xFF42);
@@ -193,7 +193,7 @@ void PPU::fetchTileNo()
 	uint16_t tileIndexAddr = startingAddr + (tileY * 32) + (tileX % 32);
 	currentTileI = memory.readPPU(tileIndexAddr);
 
-	std::cout << "SCX: " << (int)memory.readPPU(0xFF43) << " PixelsX: " << pixelsX << std::endl;
+	//std::cout << "SCX: " << (int)memory.readPPU(0xFF43) << " PixelsX: " << pixelsX << std::endl;
 
 }
 void PPU::fetchTileL()
@@ -378,7 +378,7 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 
 				writeIntoSTAT(0b11);
 
-				memory.vramLocked = true;// gonan try this for now
+				//memory.vramLocked = true;// gonan try this for now
 				curModeDebugTool = 3;
 			}
 
@@ -391,6 +391,7 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 				}
 				else
 				{
+					mode3Tick();
 					mode3Tick();
 				}
 			}
