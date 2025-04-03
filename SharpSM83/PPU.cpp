@@ -378,7 +378,7 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 
 				writeIntoSTAT(0b11);
 
-				//memory.vramLocked = true;// gonan try this for now
+				memory.vramLocked = true;// gonan try this for now
 				curModeDebugTool = 3;
 			}
 

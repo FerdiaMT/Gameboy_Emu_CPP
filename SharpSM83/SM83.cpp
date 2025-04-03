@@ -161,57 +161,102 @@ inline bool isCarryFlag()
 	return (reg.F >> 4) & 0b1;
 }
 
-
-
-
-void incByte(uint8_t& r8) //INC r8
+inline void clearZeroFlag()
 {
-	unsetNegFlag();
+	reg.F &= ~(1 << 7);
+}
+
+inline void clearNegFlag()
+{
+	reg.F &= ~(1 << 6);
+}
+
+inline void clearHalfFlag()
+{
+	reg.F &= ~(1 << 5);
+}
+
+inline void clearCarryFlag()
+{
+	reg.F &= ~(1 << 4);
+}
+
+
+
+
+void incByte(uint8_t& r8) 
+{
+	bool prev = isCarryFlag(); 
+	uint8_t temp = r8 + 1;
+
+	clearFlags();
+	clearNegFlag();
+
+	if (temp == 0) setZeroFlag(); 
 	if ((r8 & 0x0F) == 0x0F) setHalfFlag();
-	r8++;
-	if (r8 == 0) setZeroFlag(); 
+	if (prev) setCarryFlag();
+
+	r8 = temp; 
 }
 
 void decByte(uint8_t& r8) 
-{
+{ 
+	bool prev = isCarryFlag();
+	uint8_t result = r8 - 1;
+
+	clearFlags();
+	if (result == 0) setZeroFlag();
+	if ((r8 & 0x0F) == 0x00) setHalfFlag();
+	if (prev) setCarryFlag();
 	setNegFlag();
-	if ((r8 & 0x0F) == 0) setHalfFlag();
-	r8--;
-	if (r8 == 0) setZeroFlag(); 
+
+	r8 = result;
 }
 
-void addWordReg(uint16_t& r16a, uint16_t r16b)
-{
-	clearFlags();
+void addWordReg(uint16_t& r16a, uint16_t r16b) {
 
-	uint16_t r16Val = r16a + r16b;
-	if (r16a + r16b > 0xFFFF) {
-		setCarryFlag();
+	uint32_t result = (uint32_t)r16a + (uint32_t)r16b;
+
+
+	clearNegFlag();
+
+	if ((r16a & 0xFFF) + (r16b & 0xFFF) > 0xFFF) {
+		setHalfFlag(); 
 	}
-	if (r16Val == 0) {
-		setZeroFlag();
+	else {
+		clearHalfFlag();
 	}
-	if (((r16b & 0xFFF) + (r16a & 0xFFF)) > 0xFFF) {
-		setHalfFlag();  // Set Half Carry flag (bit 5)
+
+	if (result > 0xFFFF) {
+		setCarryFlag(); 
 	}
-	r16a = r16Val;
+	else {
+		clearCarryFlag();
+	}
+
+	r16a = (uint16_t)result;
 }
 
-void addWordRegSigned(uint16_t& r16a, int8_t r8b)
-{
-	clearFlags();
+void addWordRegSigned(uint16_t& r16a, int8_t r8b) {
+	uint16_t temp = r16a;
+	r16a += r8b; 
 
-	uint16_t r16Val = r16a + r8b;
-	if (r16a + r8b > 0xFFFF) {
-		setCarryFlag();
+
+	clearNegFlag(); 
+
+	if (((temp ^ r8b ^ r16a) & 0x10) != 0) {
+		setHalfFlag(); 
 	}
-	if (r16Val == 0) {
-		setZeroFlag();
+	else {
+		unsetHalfFlag(); 
 	}
-	if (((r8b & 0xFFF) + (r16a & 0xFFF)) > 0xFFF) {
-		setHalfFlag();  // Set Half Carry flag (bit 5)
+
+	if (((temp ^ r8b ^ r16a) & 0x100) != 0) {
+		setCarryFlag(); 
 	}
-	r16a = r16Val;
+	else {
+		unsetCarryFlag();
+	}
 }
 
 void addByteReg(uint8_t& r8a , uint8_t r8b)
@@ -303,10 +348,6 @@ void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
 	}
 }
 
-
-
-
-
 void SM83::call(uint16_t jumpAddr)
 {
 	reg.SP -= 2;//minus two bytes for word
@@ -325,12 +366,18 @@ uint16_t SM83::popStack()
 	return word;
 }
 
-void rlc(uint8_t& r8) // rotate left, r8  just bitshifted no other change
-{
-	clearFlags();
-	reg.F = ((r8 & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
-	r8 = (r8 << 1) & 0xFF;
-	if (r8 == 0) setZeroFlag();
+void rlc(uint8_t& r8) {
+	bool temp = (r8 >> 7) & 0x1; 
+	r8 = (r8 << 1) | temp;
+
+	if (r8 == 0) setZeroFlag();  
+	else unsetZeroFlag();
+
+	unsetNegFlag();
+	unsetHalfFlag();
+
+	if (temp) setCarryFlag();    
+	else unsetCarryFlag();
 }
 
 void rl(uint8_t& r8) // rotate left, r8 dig 1 = prev carry flag
@@ -342,12 +389,18 @@ void rl(uint8_t& r8) // rotate left, r8 dig 1 = prev carry flag
 	if (r8 == 0) setZeroFlag();
 }
 
-void rrc(uint8_t& r8)
-{
-	clearFlags();
-	reg.F = ((r8 & 0b1) << 4);
-	r8 = (r8 >> 1) & 0xFF;
+void rrc(uint8_t& r8) {
+
+	uint8_t temp = r8 & 0b1;
+	r8 = (r8 >> 1) | (temp << 7);
+
+	unsetNegFlag();
+	unsetHalfFlag();
 	if (r8 == 0) setZeroFlag();
+	else unsetZeroFlag();
+
+	if (temp)setCarryFlag();
+	else unsetCarryFlag();
 }
 
 void rr(uint8_t& r8)
@@ -367,12 +420,26 @@ void sla(uint8_t& r8)
 	if (r8 == 0) setZeroFlag();
 }
 
-void sra(uint8_t& r8)
-{
-	clearFlags();
-	if (r8 & 0b00000001) setCarryFlag();
-	r8 = (r8 >> 1) & (r8 & 0b10000000) & 0xFF;
-	if (r8 == 0) setZeroFlag();
+void sra(uint8_t& r8) { 
+	bool carry = (r8 & 0x01);
+	r8 = (r8 >> 1) | (r8 & 0x80);
+
+	if (r8 == 0) {
+		setZeroFlag();
+	}
+	else {
+		unsetZeroFlag();
+	}
+
+	unsetNegFlag();
+	unsetHalfFlag();
+
+	if (carry) {
+		setCarryFlag();
+	}
+	else {
+		unsetCarryFlag();
+	}
 }
 
 void swap(uint8_t& r8) 
@@ -946,7 +1013,7 @@ void SM83::executePrefix(uint8_t opcode)
 	case 0x96: {// whatever hl is pointing to
 		addCycle(2);
 		uint8_t a8 = memory.read(reg.HL);
-		res(0, a8);
+		res(2, a8);
 		memory.write(reg.HL, a8);
 	} break;
 	case 0x97: {
@@ -1332,6 +1399,13 @@ void SM83::executePrefix(uint8_t opcode)
 
 void SM83::execute(uint8_t opcode)
 {
+
+	if (IME_nextCycle)
+	{
+		IME = true;
+		IME_nextCycle = false;
+	}
+
 	switch (opcode) {
 
 	case 0x00: { // no op
@@ -1358,6 +1432,9 @@ void SM83::execute(uint8_t opcode)
 	}break;
 	case 0x07: { // rotate register A left 
 		rlc(reg.A);
+		unsetZeroFlag();
+		unsetNegFlag();
+		unsetHalfFlag();
 	}break;
 	case 0x08: { // load [a16] , SP
 		uint16_t wordAdr = memory.readWord(reg.PC); reg.PC+=2;
@@ -1384,6 +1461,9 @@ void SM83::execute(uint8_t opcode)
 	}break;
 	case 0x0F: {   //0b00000001
 		rrc(reg.A);
+		unsetZeroFlag();
+		unsetNegFlag();
+		unsetHalfFlag();
 	}break;
 
 	//====0x1?===================================================
@@ -1416,6 +1496,9 @@ void SM83::execute(uint8_t opcode)
 	}break;
 	case 0x17: { // rotate register A left ,carry goes into a
 		rl(reg.A);
+		unsetZeroFlag();
+		unsetNegFlag();
+		unsetHalfFlag();
 	}break;
 	case 0x18: { // jump to e8
 
@@ -1443,6 +1526,9 @@ void SM83::execute(uint8_t opcode)
 	}break;
 	case 0x1F: {   //RRA //0bznhc0000
 		rr(reg.A);
+		unsetZeroFlag();
+		unsetNegFlag();
+		unsetHalfFlag();
 	}break;
 
 	//====0x2?===================================================
@@ -1478,47 +1564,46 @@ void SM83::execute(uint8_t opcode)
 	case 0x26: {
 		reg.H = memory.read(reg.PC); reg.PC++;
 	}break;
-	case 0x27: { // DAA (confusing one)
-		//check if n is set
-		//0bznhc0000
-		//   x
-		bool setCarry = false;
-		if (isNegFlag()) //if neg flag is set
-		{
-			uint8_t adjustment = 0;
-			if (isHalfFlag())//half carry is set
-			{
-				adjustment += 0x6;
-			}
-			if (isCarryFlag()) {//carry flag
-				adjustment += 0x60;
-			}
-			reg.A -= adjustment;
+	case 0x27: { // potentially fixed ? unsure
+		uint8_t a = reg.A;
+		bool c = isCarryFlag();
+		bool h = isHalfFlag();
+		bool n = isNegFlag();
 
-		}
-		else {
-			uint8_t adjustment = 0;
-			if (isHalfFlag() || (reg.A & 0xF) > 0x9)
-			{
-				adjustment += 0x6;
-			}
-			if (isCarryFlag() || (reg.A > 0x99)) {//carry flag
-				adjustment += 0x60;
-				setCarry = true;
-			}
-			reg.A += adjustment;
-		}
-		reg.F &= 0b01000000;
-		if (reg.A == 0)
+		if (!n) 
 		{
+			if (c || a > 0x99) 
+			{
+				a += 0x60;
+				setCarryFlag();
+			}
+			if (h || (a & 0x0F) > 9) 
+			{
+				a += 0x06;
+			}
+		}
+		else 
+		{ 
+			if (c)
+			{
+				a -= 0x60;
+			}
+			if (h) 
+			{
+				a -= 0x06;
+			}
+		}
+
+		reg.A = a;
+		if (reg.A == 0) {
 			setZeroFlag();
 		}
-		if (setCarry)
-		{
-			setCarryFlag();
+		else {
+			unsetZeroFlag();
 		}
+		unsetHalfFlag(); 
+	} break;
 
-	}break;
 	case 0x28: { // jump to e8
 
 		int8_t offset = memory.read(reg.PC);  reg.PC++; // pc = 129
@@ -1582,7 +1667,7 @@ void SM83::execute(uint8_t opcode)
 		//UNSURE IF I SHOULD INCREMENT PROGRAM COUNTER FROM HERE 
 	}break;
 	case 0x35: {
-		uint8_t byte = memory.read(reg.HL); // this one wont increment
+		uint8_t byte = memory.read(reg.HL); 
 		decByte(byte);
 		memory.write(reg.HL, byte);
 	}break;
@@ -2060,9 +2145,9 @@ void SM83::execute(uint8_t opcode)
 		compareByteReg(reg.A, memory.read(reg.HL));
 	} break;
 	case 0xBF: {//these are the same so just set flags here
-		//clearFlags();
+		clearFlags();
 		setZeroFlag();
-		//setNegFlag();
+		setNegFlag();
 	} break;
 
 	//====0xC?======end of repetitive regs====================================================
@@ -2202,7 +2287,8 @@ void SM83::execute(uint8_t opcode)
 	case 0xD9: {
 		//RETURN I  SUBROUTINE
 		reg.PC = popStack();
-		IME = true;
+		//IME_nextCycle = true; //<- TODO : this fees wrong, but check this later
+
 	} break;
 	case 0xDA: {
 		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
@@ -2215,7 +2301,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xDB: { //empty
 	} break;
 	case 0xDC: {
-		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
+		uint16_t addr = memory.readWord(reg.PC); reg.PC += 2;
 		if (isCarryFlag())
 		{
 			addCycle(3);
@@ -2231,7 +2317,7 @@ void SM83::execute(uint8_t opcode)
 		call(0x18);
 	} break;
 
-	//====0xE?===============================================================
+			 //====0xE?===============================================================
 
 	case 0xE0: { // LDH [a8] a
 		uint8_t addr = memory.read(reg.PC);  reg.PC++;
@@ -2261,12 +2347,13 @@ void SM83::execute(uint8_t opcode)
 	case 0xE8: {//add sp ,e8
 		int8_t e8 = memory.read(reg.PC);  reg.PC++;
 		addWordRegSigned(reg.SP, e8);
+		unsetZeroFlag();
 	} break;
 	case 0xE9: {
 		reg.PC = reg.HL;
 	} break;
 	case 0xEA: { // load to a16
-		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
+		uint16_t addr = memory.readWord(reg.PC); reg.PC += 2;
 		memory.write(addr, reg.A);
 	} break;
 	case 0xEB: { //empty
@@ -2282,16 +2369,18 @@ void SM83::execute(uint8_t opcode)
 		call(0x28);
 	} break;
 
-	//====0xF?===============================================================
+			 //====0xF?===============================================================
 
 	case 0xF0: { // LDH  a [a8]
 		uint8_t offset = memory.read(reg.PC++);
 		uint16_t io_addr = 0xFF00 + offset;
-		reg.A = memory.read(io_addr); 
+		reg.A = memory.read(io_addr);
 		//std::cout << (int)reg.A << std::endl;
 	} break;
 	case 0xF1: {
-		reg.AF = popStack();
+		uint16_t val = popStack();
+		reg.A = (val >> 8);
+		reg.F = (val & 0xFF) & 0xF0; 
 	} break;
 	case 0xF2: { // this might be wrong
 		uint16_t io_addr = 0xFF00 + reg.C;
@@ -2313,6 +2402,9 @@ void SM83::execute(uint8_t opcode)
 	} break;
 	case 0xF8: {//load into reg.hl, SP + e8
 		int8_t byte = memory.read(reg.PC);  reg.PC++;
+		clearFlags();
+		if ((reg.SP & 0xF) + (byte & 0xF) > 0xF) setHalfFlag();
+		if ((reg.SP & 0xFF) + (byte & 0xFF) > 0xFF) setCarryFlag();
 		reg.HL = reg.SP + byte;
 	} break;
 	case 0xF9: {
@@ -2345,11 +2437,7 @@ void SM83::execute(uint8_t opcode)
 	*	end of giant switch statement	 *
 	*/									//
 
-	if (IME_nextCycle)
-	{
-		IME = true;
-		IME_nextCycle = false;
-	}
+
 }
 
 void SM83::reset()
@@ -2373,28 +2461,7 @@ void SM83::handleInterrupts()
 	if (!IF)return;
 	uint8_t IE = memory.read(0xFF0F);
 	if (!IE)return;
-	
-	//IF ~ Interrupt Flag, 
-	//IE ~ Interrupt Enable
 
-
-	//interruptsd are checked before fetching new instruction
-	// if any IF flag and corresponding IE flag are both 1
-	// and IME is 1
-	//CPU will push the current PC to the stack
-	//will jump to the corresponding interrupt vector
-	//set IME to 0
-	//flags are only cleared when CPU jumps to interrupt vector
-	//if both called same time, lower bank has priority (vBlank has highest)
-	//takes 20 clocks to dispath interrupt
-	//if cpu is in HALT mode , another 4 clocks are needed
-
-	//so, if we got this far, IME is on
-	//IF and IE have A value
-
-	//can only do one, in which lowest priority first (vBlank)
-
-	//std::cout<< (int)IF<<std::endl;
 	if (IF & 0b1 && IE & 0b1) //bit0 vBlank
 	{
 		//the corresponding IF bit and IME flag are reset
@@ -2443,7 +2510,7 @@ void SM83::handleInterrupts()
 
 uint8_t SM83::executeInstruction()
 {
-	handleInterrupts();
+
 
 	uint8_t opcode = memory.read(reg.PC); //fetch
 
@@ -2454,6 +2521,8 @@ uint8_t SM83::executeInstruction()
 
 	execute(opcode); // decode - execute
 	
+	handleInterrupts();
+
 	//std::cout <<"A : " << (int)reg.A <<"   ";
 	//std::cout <<"BC: " << (int)reg.BC<<"   ";
 	//std::cout <<"DE: " << (int)reg.DE<<"   ";

@@ -64,10 +64,6 @@ void setPixelState(Memory& memory) //do this later
 
 }
 
-
-
-
-
 void drawAllPixels(Memory& memory)
 {
     for (int x = 0; x < WIDTH; x++)
@@ -159,6 +155,7 @@ int main()
     ppu.resetPPU();
     clock.resetClock();
    
+    //DEBUGS TO GET WORKING: -, 2, - , - , - , - , - , -, - , - , -
     std::ifstream file("cpu_instrs.gb", std::ios::binary | std::ios::ate);
 
     bool skipBootROM = true; 
@@ -175,39 +172,20 @@ int main()
 
         for (int i = 0; i < size; ++i)
         {
-            memory.write(i, buffer[i]);
+           memory.write(i, buffer[i]);
         }
         delete[] buffer;
         std::cout << "done loading memory" << std::endl;
     }
 
-    //for (uint16_t i = 0; i < 256; i++) {
-    //    memory.write(i, bootROM[i]);
-    //}
-
-    //for (uint16_t i = 0x104; i < 0x133; i++)
-    //{
-    //    memory.write(i, cartROM[i - 0x104]);
-    //}
-
-
-    //baarg test rom
-
-
-   /* uint8_t checkerboard[16] = {
-        0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55,  // 2BPP data
-        0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55
-    };
-
-    for (int i = 0; i < 16; i++) {
-        memory.write(0x8000 + i, checkerboard[i]);
+    for (uint16_t i = 0; i < 256; i++) {
+        memory.write(i, bootROM[i]);
     }
 
-    for (int i = 0x9800; i < 0x9A00; i++) {
-        memory.write(i, 0x00);
+    for (uint16_t i = 0x104; i < 0x133; i++)
+    {
+        memory.write(i, cartROM[i - 0x104]);
     }
-
-    memory.write(0xFF40, 0b10000001);*/
 
     if (skipBootROM) {
 
