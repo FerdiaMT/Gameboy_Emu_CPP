@@ -184,22 +184,20 @@ inline void clearCarryFlag()
 
 
 
-void incByte(uint8_t& r8) 
+void incByte(uint8_t& r8) //example 0x04
 {
 	bool prev = isCarryFlag(); 
 	uint8_t temp = r8 + 1;
 
 	clearFlags();
-	clearNegFlag();
-
-	if (temp == 0) setZeroFlag(); 
+	if (temp == 0) setZeroFlag();
 	if ((r8 & 0x0F) == 0x0F) setHalfFlag();
 	if (prev) setCarryFlag();
 
 	r8 = temp; 
 }
 
-void decByte(uint8_t& r8) 
+void decByte(uint8_t& r8) //0x05
 { 
 	bool prev = isCarryFlag();
 	uint8_t result = r8 - 1;
@@ -213,7 +211,7 @@ void decByte(uint8_t& r8)
 	r8 = result;
 }
 
-void addWordReg(uint16_t& r16a, uint16_t r16b) {
+void addWordReg(uint16_t& r16a, uint16_t r16b) { // example 0x09 , {- 0 H C}
 
 	uint32_t result = (uint32_t)r16a + (uint32_t)r16b;
 
@@ -237,12 +235,13 @@ void addWordReg(uint16_t& r16a, uint16_t r16b) {
 	r16a = (uint16_t)result;
 }
 
-void addWordRegSigned(uint16_t& r16a, int8_t r8b) {
+void addWordRegSigned(uint16_t& r16a, int8_t r8b) { //00HC
 	uint16_t temp = r16a;
 	r16a += r8b; 
 
-
+	clearZeroFlag();
 	clearNegFlag(); 
+	
 
 	if (((temp ^ r8b ^ r16a) & 0x10) != 0) {
 		setHalfFlag(); 
@@ -259,7 +258,7 @@ void addWordRegSigned(uint16_t& r16a, int8_t r8b) {
 	}
 }
 
-void addByteReg(uint8_t& r8a , uint8_t r8b)
+void addByteReg(uint8_t& r8a , uint8_t r8b) //0x80 line , {Z0HC}
 {
 	clearFlags();
 	uint16_t r16= r8a + r8b;
@@ -271,7 +270,7 @@ void addByteReg(uint8_t& r8a , uint8_t r8b)
 	r8a = (uint8_t)r16;
 }
 
-void addCarryByteReg(uint8_t& r8a, uint8_t r8b)
+void addCarryByteReg(uint8_t& r8a, uint8_t r8b) //0x88 {Z0HC}
 {
 	uint8_t carry = isCarryFlag() ? 1 : 0;
     clearFlags();
@@ -309,7 +308,7 @@ void subCarryByteReg(uint8_t& r8a, uint8_t r8b)
 	r8a = (uint8_t)r16;
 }
 
-void andByteReg(uint8_t& r8a, uint8_t r8b)
+void andByteReg(uint8_t& r8a, uint8_t r8b) // XA0 {z010}
 {
 	clearFlags();
 	setHalfFlag();
@@ -331,10 +330,12 @@ void orByteReg(uint8_t& r8a, uint8_t r8b)
 	if (r8a == 0x0)setZeroFlag();
 }
 
-void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result
+void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result {Z1HC}
 {//basically only cares about flags
 	clearFlags();
+
 	setNegFlag();
+
 	if (r8b > r8a)
 	{
 		setCarryFlag();
@@ -366,7 +367,7 @@ uint16_t SM83::popStack()
 	return word;
 }
 
-void rlc(uint8_t& r8) {
+void rlc(uint8_t& r8) { //TODO : look into how the carry should work here, i mgiht be wrong
 	bool temp = (r8 >> 7) & 0x1; 
 	r8 = (r8 << 1) | temp;
 
@@ -457,7 +458,7 @@ void srl(uint8_t& r8)
 	if (r8 == 0) setZeroFlag();
 }
 
-void bit(uint8_t u3, uint8_t r8)
+void bit(uint8_t u3, uint8_t r8) // {Z01-}
 {
 	unsetNegFlag();
 	setHalfFlag();
@@ -1535,7 +1536,8 @@ void SM83::execute(uint8_t opcode)
 
 	case 0x20: { // JR NZ , e8
 		// jump to e8 if NotZ is met
-		int8_t offset = memory.read(reg.PC);  reg.PC++; // pc = 129
+		int8_t offset = memory.read(reg.PC);  
+		reg.PC++; // pc = 129
 		if (!isZeroFlag())
 		{
 			addCycle();
@@ -2515,8 +2517,8 @@ uint8_t SM83::executeInstruction()
 	uint8_t opcode = memory.read(reg.PC); //fetch
 
 
-	//std::cout << std::hex << (int)opcode << "   $" << std::hex << (int)reg.PC << "  ";
-
+	//std::cout << std::hex << (int)opcode << "   $" << std::hex << (int)reg.PC << std::endl;
+	//std::cout <<"E: " << (int)reg.E<<"   "<< "zFlag:"<< isZeroFlag() << " C :" << (int)reg.C;
 	reg.PC++;
 
 	execute(opcode); // decode - execute
@@ -2525,7 +2527,7 @@ uint8_t SM83::executeInstruction()
 
 	//std::cout <<"A : " << (int)reg.A <<"   ";
 	//std::cout <<"BC: " << (int)reg.BC<<"   ";
-	//std::cout <<"DE: " << (int)reg.DE<<"   ";
+	
 	//std::cout <<"HL: " << (int)reg.HL << "   ";
 	//std::cout << std::endl;
 	//std::cout << "8000: " << std::hex << (int)memory.read(0x8000);

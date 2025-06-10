@@ -19,6 +19,10 @@ bool running = true;
 SDL_Window* window;
 SDL_Renderer* renderer;
 
+
+SDL_Window* window2;
+SDL_Renderer* renderer2;
+
 const int WIDTH = 160;
 const int HEIGHT = 144;
 const int SCALE = 5;
@@ -59,9 +63,128 @@ void setupSDL()
     }
 }
 
+void setupSDL2()
+{
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    {
+        std::cerr << "SDL could not initialize" << SDL_GetError();
+        return;
+    }
+
+    window2 = SDL_CreateWindow("ABC", 8*16 * SCALE, 8*24 * SCALE, SDL_WINDOW_RESIZABLE);
+    if (!window2)
+    {
+        std::cerr << "Window couldnt be created " << SDL_GetError();
+        return;
+    }
+
+    renderer2 = SDL_CreateRenderer(window2, NULL);
+    if (!renderer2)
+    {
+        std::cerr << "Renderer couldnt be created " << SDL_GetError();
+        SDL_Quit;
+        return;
+    }
+}
+
 void setPixelState(Memory& memory) //do this later
 {
 
+}
+
+
+uint8_t pixeldemo[0x9000]{};
+
+void loadTestPalette()
+{
+
+    uint8_t tester[16] = { 0x3C, 0x7E,
+        0x42, 0x42,
+        0x42, 0x42,
+        0x42, 0x42,
+        0x7E, 0x5E,
+        0x7E, 0x0A,
+        0x7C, 0x56,
+        0x38, 0x7C };
+
+    for (int i = 0x8000; i < 0x9FFF; i+=16) {
+        uint8_t counter{};
+        while (counter < 16) {
+            pixeldemo[counter + i] = tester[counter];
+            counter++;
+        }
+    }
+    pixeldemo[0x8010] = 0xFF;
+    pixeldemo[0x8011] = 0xFF;
+
+    pixeldemo[0x8080] = 0xFF;
+    pixeldemo[0x8081] = 0xFF;
+
+    pixeldemo[0x8100] = 0xFF;
+    pixeldemo[0x8101] = 0xFF;
+
+
+}
+
+void drawTextureWindow(Memory& memory) // going to use this to draw out the textures
+{
+
+    //each tile takes up 16 bytes.
+    //each byte is a line , overlay 2 to get proper image
+
+    //00 ~ white
+    //01 ~ weak
+    //10 ~ medium
+    //11 ~ black
+
+    uint8_t c = 0;
+    int level = 0x8000;
+
+    for (int th = 0; th < 24; th++) {
+        for (int tw = 0; tw < 16; tw++) {
+
+
+
+            for (int y = 0; y < 8; y++) {
+
+                uint8_t row1 = pixeldemo[level + (y * 2) + (tw*16) + (th*16*8*2)];
+                uint8_t row2 = pixeldemo[level + (y * 2) + 1 + (tw * 16) + (th * 16 * 8*2)];
+                for (int x = 0; x < 8; x++) {
+                    uint8_t bit1 = row1 >> (7 - x) & 0b1;
+                    uint8_t bit2 = row2 >> (7 - x) & 0b1;
+
+                    uint8_t mainBit = bit2 << 1 | bit1;
+
+                    switch (mainBit)
+                    {
+                    case(0b11): {
+                        c = 0;
+                    }break;
+                    case(0b10): {
+                        c = 60;
+                    }break;
+                    case(0b01): {
+                        c = 190;
+                    }break;
+                    case(0): {
+                        c = 255; // black
+                    }break;
+
+                    }
+                    SDL_SetRenderDrawColor(renderer2, c, c, c, 255);
+                    SDL_FRect pixel = { (SCALE * tw*8) + (x * SCALE),  (SCALE * th * 8) + (y * SCALE), SCALE, SCALE};//x,y,w,h
+                    SDL_RenderFillRect(renderer2, &pixel);
+
+                   
+
+                }
+            }
+        }
+    }
+
+    SDL_RenderPresent(renderer2);
+
+    
 }
 
 void drawAllPixels(Memory& memory)
@@ -142,6 +265,11 @@ double cpuCyclesPerFrame = 4194304.0 / 59.7;
 
 int main()
 {
+
+    loadTestPalette();
+
+
+
 	Memory memory;
 
 	SM83 cpu(memory);
@@ -155,7 +283,7 @@ int main()
     ppu.resetPPU();
     clock.resetClock();
    
-    //DEBUGS TO GET WORKING: -, 2, - , - , - , - , - , -, - , - , -
+    //DEBUGS TO GET WORKING: -, 2, - , - , - , - , 7 , -, - , - , -
     std::ifstream file("cpu_instrs.gb", std::ios::binary | std::ios::ate);
 
     bool skipBootROM = true; 
@@ -225,6 +353,7 @@ int main()
     }
 
     setupSDL();
+    setupSDL2();
     SDL_Event event;
 
     //going to do this without the whole clock class for now
@@ -253,6 +382,8 @@ int main()
             }
             ppu.updateScreenBuffer(pixelState);
             drawAllPixels(memory);
+
+            drawTextureWindow(memory);
            
             lastCycleTime = currentTime;
             allCycles = 0;
