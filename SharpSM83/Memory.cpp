@@ -222,11 +222,11 @@ void Memory::write(uint16_t address, uint8_t data)
 	}
 	else if (address <= VRAM_UB)
 	{
-		if (vramLocked)
-		{
-			
-			return;
-		}
+		//if (vramLocked)
+		//{
+		//	
+		//	return;
+		//}
 		
 		vram[address - VRAM_LB] = data;
 	}

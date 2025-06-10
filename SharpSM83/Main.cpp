@@ -143,12 +143,11 @@ void drawTextureWindow(Memory& memory) // going to use this to draw out the text
     for (int th = 0; th < 24; th++) {
         for (int tw = 0; tw < 16; tw++) {
 
-
-
             for (int y = 0; y < 8; y++) {
 
-                uint8_t row1 = pixeldemo[level + (y * 2) + (tw*16) + (th*16*8*2)];
-                uint8_t row2 = pixeldemo[level + (y * 2) + 1 + (tw * 16) + (th * 16 * 8*2)];
+                uint8_t row1 = memory.readPPU(level + (y * 2) + (tw * 16) + (th * 16 * 8 * 2));
+                uint8_t row2 = memory.readPPU(level + (y * 2) + 1 + (tw * 16) + (th * 16 * 8*2));
+
                 for (int x = 0; x < 8; x++) {
                     uint8_t bit1 = row1 >> (7 - x) & 0b1;
                     uint8_t bit2 = row2 >> (7 - x) & 0b1;
@@ -265,11 +264,6 @@ double cpuCyclesPerFrame = 4194304.0 / 59.7;
 
 int main()
 {
-
-    loadTestPalette();
-
-
-
 	Memory memory;
 
 	SM83 cpu(memory);
@@ -284,7 +278,7 @@ int main()
     clock.resetClock();
    
     //DEBUGS TO GET WORKING: -, 2, - , - , - , - , 7 , -, - , - , -
-    std::ifstream file("cpu_instrs.gb", std::ios::binary | std::ios::ate);
+    std::ifstream file("04-op.gb", std::ios::binary | std::ios::ate);
 
     bool skipBootROM = true; 
 
