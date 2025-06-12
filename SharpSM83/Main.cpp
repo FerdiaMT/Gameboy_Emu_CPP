@@ -23,9 +23,12 @@ SDL_Renderer* renderer;
 SDL_Window* window2;
 SDL_Renderer* renderer2;
 
+SDL_Window* window3;
+SDL_Renderer* renderer3;
+
 const int WIDTH = 160;
 const int HEIGHT = 144;
-const int SCALE = 7;
+const int SCALE = 5;
 
 
 uint8_t pixelState[160][144]{}; // for now this can be 0,1,2,3,4
@@ -86,6 +89,31 @@ void setupSDL2()
         return;
     }
 }
+
+void setupSDL3()
+{
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
+    {
+        std::cerr << "SDL could not initialize" << SDL_GetError();
+        return;
+    }
+
+    window3 = SDL_CreateWindow("DEF", (8 * 32 * SCALE), (8 * 32 * SCALE), SDL_WINDOW_RESIZABLE);
+    if (!window3)
+    {
+        std::cerr << "Window couldnt be created " << SDL_GetError();
+        return;
+    }
+
+    renderer3 = SDL_CreateRenderer(window3, NULL);
+    if (!renderer3)
+    {
+        std::cerr << "Renderer couldnt be created " << SDL_GetError();
+        SDL_Quit;
+        return;
+    }
+}
+
 
 void setPixelState(Memory& memory) //do this later
 {
@@ -149,33 +177,21 @@ void drawTextureWindow(Memory& memory) // going to use this to draw out the text
                 uint8_t row2 = memory.readPPU(level + (y * 2) + 1 + (tw * 16) + (th * 16 * 8*2));
 
                 for (int x = 0; x < 8; x++) {
-                    uint8_t bit1 = row1 >> (7 - x) & 0b1;
-                    uint8_t bit2 = row2 >> (7 - x) & 0b1;
 
-                    uint8_t mainBit = bit2 << 1 | bit1;
+                    // if 0 = 255
 
-                    switch (mainBit)
+                    uint8_t mainBit = (row2 >> (7 - x) & 0b1) << 1 | (row1 >> (7 - x) & 0b1);
+                    if (mainBit == 0b11)
                     {
-                    case(0b11): {
                         c = 0;
-                    }break;
-                    case(0b10): {
-                        c = 60;
-                    }break;
-                    case(0b01): {
-                        c = 190;
-                    }break;
-                    case(0): {
-                        c = 255; // black
-                    }break;
-
+                    }
+                    else
+                    {
+                        c = 255 - (mainBit * 100);
                     }
                     SDL_SetRenderDrawColor(renderer2, c, c, c, 255);
                     SDL_FRect pixel = { (SCALE * tw*8) + (x * SCALE),  (SCALE * th * 8) + (y * SCALE), SCALE, SCALE};//x,y,w,h
                     SDL_RenderFillRect(renderer2, &pixel);
-
-                   
-
                 }
             }
         }
@@ -219,6 +235,56 @@ void drawAllPixels(Memory& memory)
     SDL_RenderPresent(renderer);
 }
 
+static void drawMapA(Memory& memory)
+{
+    uint8_t c = 0;
+    uint16_t level = 0x9800; // this can also be 9c00 // goes up to 9bFF // 9800
+
+    //32 * 32 tiles , increase per bit
+
+
+
+    for (int th = 0; th < 32; th++) {
+        for (int tw = 0; tw < 32; tw++) {
+           // std::cout << std::hex << (level + tw + (th * 32)) << std::endl;
+            
+            uint16_t tileAddr = (memory.readPPU((level + tw + (th * 32))) * 0x10);
+           // std::cout << std::hex << tileAddr << std::endl;
+
+
+            for (int y = 0; y < 8; y++) {
+
+                //uint8_t row1 = memory.readPPU((y * 2) + tileAddr); // tile INdex A
+                //uint8_t row2 = memory.readPPU((y * 2) + tileAddr+1); // tile Index B
+
+                uint8_t row1 = memory.readPPU(0x8000 + tileAddr + (y * 2));
+                uint8_t row2 = memory.readPPU(0x8000 + tileAddr + (y * 2));
+
+                for (int x = 0; x < 8; x++) {
+
+                    uint8_t mainBit = (row2 >> (7 - x) & 0b1) << 1 | (row1 >> (7 - x) & 0b1);
+                    if (mainBit == 0b11)
+                    {
+                        c = 0;
+                    }
+                    else
+                    {
+                        c = 255 - (mainBit * 100);
+                    }
+
+                    SDL_SetRenderDrawColor(renderer3, c, c, c, 255);
+                    SDL_FRect pixel2 = { (SCALE * tw * 8) + (x * SCALE),  (SCALE * th * 8) + (y * SCALE), SCALE, SCALE };//x,y,w,h
+                    SDL_RenderFillRect(renderer3, &pixel2);
+                }
+              
+            }
+           
+        }
+     
+    }
+    SDL_RenderPresent(renderer3);
+}
+
 
 uint8_t bootROM[256] = {
     0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
@@ -240,7 +306,7 @@ uint8_t bootROM[256] = {
 };
 
 uint8_t cartROM[0x30] = {
-    0xE, 0xED, 0x66 ,0x66 ,0xCC ,0x0D ,0x00 ,0x0B, 0x03 ,0x73, 0x00 ,0x83 ,0x00,0x0C,0x00, 0x0D,
+    0xCE, 0xED, 0x66 ,0x66 ,0xCC ,0x0D ,0x00 ,0x0B, 0x03 ,0x73, 0x00 ,0x83 ,0x00,0x0C,0x00, 0x0D,
     0x00, 0x08 ,0x11 ,0x1F ,0x88 ,0x89, 0x00, 0x0E, 0xDC ,0xCC ,0x6E ,0xE6 ,0xDD, 0xDD, 0xD9 ,0x99,
     0xBB, 0xBB, 0x67 ,0x63, 0x6E, 0x0E ,0xEC ,0xCC ,0xDD ,0xDC, 0x99 ,0x9F, 0xBB, 0xB9, 0x33, 0x3E
 };
@@ -280,7 +346,7 @@ int main()
     //DEBUGS TO GET WORKING: -, 2, - , - , - , - , 7 , -, - , - , -
     std::ifstream file("04-op.gb", std::ios::binary | std::ios::ate);
 
-    bool skipBootROM = true; 
+    bool skipBootROM = false; 
 
     if (file.is_open())
     {
@@ -347,7 +413,8 @@ int main()
     }
 
     setupSDL();
-    setupSDL2();
+    //setupSDL2();
+    setupSDL3(); // <- map viewer
     SDL_Event event;
 
     //going to do this without the whole clock class for now
@@ -364,7 +431,7 @@ int main()
         auto currentTime = std::chrono::high_resolution_clock::now();
         float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
         
-        if (dt >= 16.73) // once every 60 seconds (16.73 milliseconds)
+        if (dt >= 500/*16.73*/) // once every 60 seconds (16.73 milliseconds)
         {
             int waitCycle = allCycles - 17573;
             if (waitCycle > 0)
@@ -377,11 +444,14 @@ int main()
             ppu.updateScreenBuffer(pixelState);
             drawAllPixels(memory);
 
-            drawTextureWindow(memory);
+            //drawTextureWindow(memory);
+
+            
            
             lastCycleTime = currentTime;
             allCycles = 0;
             cpu.cycles = 0; // i know this is bad practice, but this is just demoing my idea
+            drawMapA(memory);
         }
 
         allCycles++;
@@ -390,10 +460,10 @@ int main()
 
         clock.handleTimers(allCycles);
 
-        ppu.executeTick(allCycles);
-        ppu.executeTick(allCycles);
-        ppu.executeTick(allCycles);
-        ppu.executeTick(allCycles);
+        //ppu.executeTick(allCycles);
+        //ppu.executeTick(allCycles);
+        //ppu.executeTick(allCycles);
+        //ppu.executeTick(allCycles);
 
 
 

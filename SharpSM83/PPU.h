@@ -35,6 +35,7 @@ private:
 	uint16_t fetchTileData(uint8_t tileIndex);
 	void drawPixel(uint8_t finalPixel);
 
+	void tileFetcher();
 
 };
 #endif

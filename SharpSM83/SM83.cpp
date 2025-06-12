@@ -2519,6 +2519,7 @@ uint8_t SM83::executeInstruction()
 
 	//std::cout << std::hex << (int)opcode << "   $" << std::hex << (int)reg.PC << std::endl;
 	//std::cout <<"E: " << (int)reg.E<<"   "<< "zFlag:"<< isZeroFlag() << " C :" << (int)reg.C;
+	//std::cout << std::hex << (int)opcode << std::endl;
 	reg.PC++;
 
 	execute(opcode); // decode - execute

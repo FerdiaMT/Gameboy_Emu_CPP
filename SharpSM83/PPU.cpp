@@ -45,7 +45,8 @@ uint8_t curItemsOnScanline = 0;
 
 uint8_t oamBuffer[40]{};
 
-void PPU::mode2Tick() 
+
+void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE 
 {
 	//FE00 , FE9F is OAM
 	// only 10 per scanline
@@ -74,11 +75,10 @@ void PPU::mode2Tick()
 			oamBuffer[(curItemsOnScanline * 4) -3 ] = memory.readPPU(searchAddr + 1); // x 
 			oamBuffer[(curItemsOnScanline * 4) -2 ] = memory.readPPU(searchAddr + 2); // tile index
 			oamBuffer[(curItemsOnScanline * 4) -1 ] = memory.readPPU(searchAddr + 3); // attributes
-			std::cout << "item added " << (int)oamBuffer[(curItemsOnScanline * 4) - 1]<<std::endl;
 			
 			//4 bytes  , BYTE  = 8 bit
 		}
-
+		
 
 		searchAddr += 0x04; 
 	}
@@ -88,9 +88,56 @@ void PPU::mode2Tick()
 
 }
 
+uint8_t fetchX{};
+
+uint8_t screenX{};
+uint8_t screenY{};
+
+uint16_t memAddr{};
+
+void PPU::fetchTileNo()
+{
+	
+
+	if (memory.ioFetchLCDC() & 0b1000)
+	{
+		memAddr = 0x9C00;
+	}
+	else
+	{
+		memAddr = 0x9800;
+	}
+
+
+}
+
+
+
+void PPU::tileFetcher()
+{
+	fetchTileNo();
+}
+
+
+uint8_t mode3Penalty{};
+
+
 void PPU::mode3Tick() 
 {
+	//std::cout << "MODE 3 " << (int)memory.ioFetchLY() << std::endl;
+
+	//background + window fetch
+	tileFetcher();
+	//oam fetch
+
+	//merge
+
+	//push to fifo
+
+
 }
+
+
 
 
 void PPU::executeTick(int allCycles) // measured in m cycles
@@ -115,6 +162,8 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 		}
 		else if (internalDot > 80)
 		{
+
+			searchAddr = 0xFE00; // for the oam
 
 			//Mode 3 is 172 to 289 dots long
 			if (!mode3Complete)
