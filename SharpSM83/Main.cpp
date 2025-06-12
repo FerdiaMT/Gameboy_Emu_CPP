@@ -25,7 +25,7 @@ SDL_Renderer* renderer2;
 
 const int WIDTH = 160;
 const int HEIGHT = 144;
-const int SCALE = 5;
+const int SCALE = 7;
 
 
 uint8_t pixelState[160][144]{}; // for now this can be 0,1,2,3,4
@@ -195,17 +195,17 @@ void drawAllPixels(Memory& memory)
             int c{};
             switch (pixelState[x][y]) // each of these can be either 0,1,2 or 3 (11 - white, 10 - 33%, 01 - 66%, 00 = 100%)
             {
-            case(3): {
-                c = 255;
+            case(0b11): {
+                c = 0;
             }break;
-            case(2): {
-                c = 170;
+            case(0b10): {
+                c = 60;
             }break;
-            case(1): {
-                c = 85;
+            case(0b01): {
+                c = 190;
             }break;
             case(0): {
-                c = 0; // black
+                c = 255; // black
             }break;
 
             }

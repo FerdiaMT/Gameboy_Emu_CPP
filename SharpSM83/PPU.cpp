@@ -4,20 +4,23 @@
 #include <iostream>
 #include <queue>
 #include <cstring>
+
+#define LCDC 0xFF40 // <- this is the most important one 
+#define STAT 0xFF41 // lcd status
+#define	SCY  0xFF42 // screen y 
+#define	SCX  0xFF43 // screen x
+#define LY   0xFF44 // LCD Y coordinate
+#define LYC  0xFF45// LY compare
+#define DMA  0xFF46 // OAM dma
+#define BGP  0xFF47 // background pallete
+#define OBP0 0xFF48// obj p 0
+#define OBP1 0xFF49 // obj p 1
+#define WY   0xFF4A// window x 
+#define WX   0xFF4B // window y 
+
 uint16_t Mem{}; //<- not sure why i added this, may delete later 
 
-#define LCDC 0xFF40; // <- this is the most important one 
-#define STAT 0xFF41; // lcd status
-#define	SCY  0xFF42; // screen y 
-#define	SCX  0xFF43; // screen x
-#define LY   0xFF44; // LCD Y coordinate
-#define LYC  0xFF45; // LY compare
-#define DMA  0xFF46; // OAM dma
-#define BGP  0xFF47; // background pallete
-#define OBP0 0xFF48; // obj p 0
-#define OBP1 0xFF49; // obj p 1
-#define WY   0xFF4A; // window x 
-#define WX   0xFF4B; // window y 
+
 
 PPU::PPU(Memory& memory) : memory(memory) //m cycle (using this) = 4 t states
 {
@@ -41,6 +44,10 @@ std::queue<uint8_t> backgroundFifo{};
 std::queue<uint8_t>  spriteFifo{};
 
 bool mode3Finished = false;
+bool fetchedFirstTile = false;
+
+bool windowTriggeredThisScanline = false;
+bool windowEnabled = false; 
 int mode3MCycles{};
 int mode3TCycles{};
 
@@ -59,7 +66,7 @@ int curModeDebugTool{};
 void PPU::writeIntoSTAT(uint8_t mode)
 {
 	uint8_t val = memory.readPPU(0xFF41);
-	val |= mode;
+	val = (val & 0b11111100) | mode; 
 	memory.writePPU(0xFF41, val);
 
 	if (mode == 0b00 && ((val & 0b1000) >> 3 == 1)) //mode 0 trigger
@@ -96,7 +103,7 @@ void PPU::mode2Tick() // search for objs on this current line
 
 	if (spriteBufferPointer > 36) return;
 
-	uint8_t spriteY = memory.readPPU(0xFFE0 + oamSearch);
+	uint8_t spriteY = memory.readPPU(0xFE00 + oamSearch); //FFE0
 
 	uint8_t currentModeHeight = 8;
 
@@ -109,29 +116,38 @@ void PPU::mode2Tick() // search for objs on this current line
 	if (currentLY + 16 >= spriteY && currentLY + 16 <= spriteY + currentModeHeight) // this is the byte 0
 	{
 		// add this entire sprite to the buffer
-		uint8_t spriteX = memory.readPPU(0xFFE1 + oamSearch);
+		uint8_t spriteX = memory.readPPU(0xFE01 + oamSearch);
 		if (spriteX > 8 && spriteX < 168) // not sure if this means 0 as in 0 or 8
 		{
 			spriteBuffer[spriteBufferPointer++] = spriteY;
 			spriteBuffer[spriteBufferPointer++] = spriteX;
-			spriteBuffer[spriteBufferPointer++] = memory.readPPU(0xFFE2 + oamSearch);
-			spriteBuffer[spriteBufferPointer++] = memory.readPPU(0xFFE3 + oamSearch);
+			spriteBuffer[spriteBufferPointer++] = memory.readPPU(0xFE02 + oamSearch);
+			spriteBuffer[spriteBufferPointer++] = memory.readPPU(0xFE03 + oamSearch);
 
 			//std::cout << "Added sprite to the pointer" << std::endl;
 				
 		}
 	}
 
-	oamSearch += 0x10;
+	oamSearch += 0x04;
+	windowTriggeredThisScanline = false;
+	windowEnabled = false; // Only true during window fetches
 	
 }
 
-
 void PPU::mode3Tick() // send pixels to the lcd
-{ // should take between 172 and 289 t cycles  (43 and 72.25 m cycles)
-
+{
 	mode3TCycles++;
+
 	uint8_t scx = memory.readPPU(0xFF43);
+	uint8_t wx = memory.readPPU(0xFF4B);
+	uint8_t wy = memory.readPPU(0xFF4A);
+	uint8_t ly = memory.readPPU(0xFF44);
+	uint8_t fineX = scx % 8;
+
+
+
+
 	if (pixelsX >= 160)
 	{
 		mode3Finished = true;
@@ -139,29 +155,37 @@ void PPU::mode3Tick() // send pixels to the lcd
 		return;
 	}
 
-	uint8_t fineX = scx % 8;
+	lcdc = memory.ioFetchLCDC();
+	bool windowDisplayEnable = (lcdc & 0x20);
 
-
-	if (pixelsX % 8 == 0 || backgroundFifo.empty()) {
-		lcdc = memory.ioFetchLCDC();
-		fetchTileNo(); 
-		fetchTileL();   
-		fetchTileH();  
-		fifoPush();    
+	if (windowDisplayEnable && ly >= wy && pixelsX == (wx - 7) && !windowTriggeredThisScanline)
+	{
+		windowEnabled = true;              
+		windowTriggeredThisScanline = true; 
+		windowLine++;                       
 	}
 
+	//std::cout << "Scanline " << (int)currentLY << ": windowLine = " << (int)windowLine << "\n";
+
+
+	if (pixelsX % 8 == 0 || backgroundFifo.empty())
+	{
+		fetchTileNo();  
+		fetchTileL();
+		fetchTileH();
+		fifoPush();
+	}
 
 	shiftPixel();
 }
+
 
 void PPU::mode0Tick(){}
 void PPU::mode1Tick(){}
 
 void PPU::fetchTileNo()
 {
-	// just before we fetched the current lcdc
-	//now check if we are rendering window or bakcground
-	uint16_t startingAddr{};
+	uint16_t baseAddr{};
 	uint8_t wy = memory.readPPU(0xFF4A); 
 	uint8_t wx = memory.readPPU(0xFF4B);
 	uint8_t scx = memory.readPPU(0xFF43);
@@ -170,43 +194,44 @@ void PPU::fetchTileNo()
 	uint8_t tileX, tileY;
 
 
-	if ((!(lcdc & 0b01000000)) && currentLY >= wy && pixelsX >= wx - 7) {
+	bool windowEnabled = (lcdc & 0x20) && (currentLY >= wy) && (pixelsX >= (wx - 7));
 
-		if (lcdc & 0b01000000) startingAddr = 0x9800;
-		else startingAddr = 0x9C00;
 
+	if (windowEnabled) {
+
+	}
+
+	if (windowEnabled) {
+		baseAddr = (lcdc & 0x40) ? 0x9C00 : 0x9800;
 		tileX = (pixelsX - (wx - 7)) / 8;
 		tileY = windowLine / 8;
-		windowLine++;
 	}
 	else {
-
-		if (lcdc & 0b1000) startingAddr = 0x9800;
-		else startingAddr = 0x9C00;
-
-		uint16_t bg_x = (pixelsX + scx) % 256;  
+		baseAddr = (lcdc & 0x08) ? 0x9C00 : 0x9800;
+		uint16_t bg_x = (pixelsX + scx) % 256;
 		uint16_t bg_y = (currentLY + scy) % 256;
 		tileX = bg_x / 8;
 		tileY = bg_y / 8;
 	}
 
-	uint16_t tileIndexAddr = startingAddr + (tileY * 32) + (tileX % 32);
+	uint16_t tileIndexAddr = baseAddr + tileY * 32 + tileX;
 	currentTileI = memory.readPPU(tileIndexAddr);
 
-	//std::cout << "SCX: " << (int)memory.readPPU(0xFF43) << " PixelsX: " << pixelsX << std::endl;
+
+
 
 }
 void PPU::fetchTileL()
 {
 	//first thing, check if were using standard indexing mode or alternate
-	uint16_t tileBase = 0x8000;
-	if (!(lcdc & 0b10000)) //0x8000 mode 
+	uint16_t tileBase{};
+	if (lcdc & 0b00010000) 
 	{
-		tileBase += (currentTileI * 16);
+		tileBase = 0x8000 + (currentTileI * 16);
 	}
-	else
+	else 
 	{
-		tileBase = (0x9000+((int8_t)currentTileI * 16)); // cast to signed int 
+		tileBase = 0x9000 + ((int8_t)currentTileI * 16);
 	}
 	uint8_t yOffs = ((currentLY + memory.readPPU(0xFF42)) % 8) ;
 	lowerByte = memory.readPPU(tileBase +yOffs);
@@ -230,33 +255,29 @@ void PPU::fifoPush() {
 	uint8_t scx = memory.readPPU(0xFF43);
 	uint8_t fineX = scx % 8;
 
-
 	for (int i = 7; i >= 0; i--) {
 		uint8_t pixel = ((upperByte >> i) & 1) << 1 | ((lowerByte >> i) & 1);
-		if (i >= fineX) backgroundFifo.push(pixel);  // Only push visible pixels
+		backgroundFifo.push(pixel);
 	}
 
-
-	if (fineX > 0) {
-		fetchTileNo();
-		fetchTileL();
-		fetchTileH();
-
-		for (int i = 7; i >= 8 - fineX; i--) {
-			uint8_t pixel = ((upperByte >> i) & 1) << 1 | ((lowerByte >> i) & 1);
-			backgroundFifo.push(pixel);
+	if (!fetchedFirstTile) {
+		for (int i = 0; i < fineX; i++) {
+			if (!backgroundFifo.empty()) backgroundFifo.pop();
 		}
+		fetchedFirstTile = true;
 	}
 }
 
 void PPU::shiftPixel() {
 	if (!backgroundFifo.empty()) {
-		screen[pixelsX % 160][currentLY] = backgroundFifo.front();
+		uint8_t bgPixel = backgroundFifo.front();
 		backgroundFifo.pop();
+
+		uint8_t finalPixel = mergeWithSprite(bgPixel, pixelsX);
+
+		screen[pixelsX % 160][currentLY] = finalPixel;
 		pixelsX++;
 	}
-
-
 }
 
 uint8_t PPU::mergeWithSprite(uint8_t bgPixel, int pixelsX)
@@ -290,19 +311,28 @@ uint8_t PPU::mergeWithSprite(uint8_t bgPixel, int pixelsX)
 	return bgPixel; 
 }
 
-uint8_t PPU::getSpritePixel(int spriteIndex, int spritePixelX)
-{
+uint8_t PPU::getSpritePixel(int spriteIndex, int spritePixelX) {
+	uint8_t spriteY = spriteBuffer[spriteIndex * 4 + 0];
+	uint8_t spriteX = spriteBuffer[spriteIndex * 4 + 1];
+	uint8_t tileIndex = spriteBuffer[spriteIndex * 4 + 2];
+	uint8_t attributes = spriteBuffer[spriteIndex * 4 + 3];
 
-	uint16_t tileData = fetchTileData(spriteBuffer[spriteIndex * 4 + 2]);
-
-	if (((spriteBuffer[spriteIndex * 4 + 3] & 0x20) != 0))
-	{
-		spritePixelX = 7 - spritePixelX; 
+	int yOffset = currentLY - (spriteY - 16);
+	if (attributes & 0x40) 
+	{ 
+		yOffset = 7 - yOffset;
 	}
 
-	return (tileData >> (spritePixelX * 2)) & 0x03;
+	uint16_t tileAddr = 0x8000 + tileIndex * 16 + yOffset * 2;
+	uint8_t lowByte = memory.readPPU(tileAddr);
+	uint8_t highByte = memory.readPPU(tileAddr + 1);
 
+	int bitIndex = (attributes & 0x20) ? spritePixelX : (7 - spritePixelX);
+	uint8_t pixel = ((highByte >> bitIndex) & 1) << 1 | ((lowByte >> bitIndex) & 1);
+
+	return pixel;
 }
+
 
 uint16_t PPU::fetchTileData(uint8_t tileIndex)
 {
@@ -322,14 +352,14 @@ uint16_t PPU::fetchTileData(uint8_t tileIndex)
 
 void PPU::updateScreenBuffer(uint8_t (&mainScreen)[160][144])
 {
-	//std::memcpy(mainScreen, screen, sizeof(screen));// not sure if this is going to work 100%
+	std::memcpy(mainScreen, screen, sizeof(screen));// not sure if this is going to work 100%
 
-	for (int y = 0; y < 144; y++) {
-		for (int x = 0; x < 160; x++) {
+	//for (int y = 0; y < 144; y++) {
+	//	for (int x = 0; x < 160; x++) {
 
-			mainScreen[x][y] = screen[x][y];
-		}
-	}
+	//		mainScreen[x][y] = screen[x][y];
+	//	}
+	//}
 }
 
 void PPU::executeTick(int allCycles) // measured in m cycles
@@ -358,6 +388,12 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 			writeIntoSTAT(0b10);
 
 			curModeDebugTool = 2;
+
+			// this might should go here ?? V
+			backgroundFifo = std::queue<uint8_t>();
+			spriteFifo = std::queue<uint8_t>();
+			pixelsX = 0;
+
 		}
 
 		if (internalTick < 20)
@@ -379,6 +415,9 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 				writeIntoSTAT(0b11);
 
 				memory.vramLocked = true;// gonan try this for now
+				fetchedFirstTile = false;
+
+
 				curModeDebugTool = 3;
 			}
 
@@ -393,6 +432,7 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 				{
 					mode3Tick();
 					mode3Tick();
+
 				}
 			}
 		}
@@ -404,6 +444,8 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 			curModeDebugTool = 0;
 		}
 		else {
+
+
 			//reset everything
 			internalTick = -1;
 			memset(spriteBuffer, 0, 40);
@@ -413,14 +455,13 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 			memory.writePPU(0xFF44, memory.ioFetchLY() + 1);
 			mode3Finished = false;
 			mode3TCycles = 0;
+			pixelsX = 0;
+
 
 			//uint8_t currentTileI{};
-
-			pixelsX = 0;
-			uint8_t windowLine = 0;
-			uint8_t dotDelay = 0;
+			//uint8_t windowLine = 0;
+			//uint8_t dotDelay = 0;
 		}
-
 
 		internalTick++;
 	}
@@ -436,14 +477,15 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 			memory.ioWriteIF(temp |= 0b1);
 		}
 		
-		
 		if (internalTick < 1140)// wait here for 1140 cycles 
 		{
 			internalTick++;
-			if (internalTick % 114 == 0)
-			{
+			if (memory.ioFetchLY() < 153) {
 				memory.writePPU(0xFF44, memory.ioFetchLY() + 1);
-
+			}
+			else {
+				memory.writePPU(0xFF44, 0);
+				internalTick = 0;
 			}
 		}
 		else 
