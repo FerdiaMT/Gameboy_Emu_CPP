@@ -41,9 +41,11 @@ public:
 	void ioWriteTMA(uint8_t data);
 	void ioWriteTAC(uint8_t data);
 	void ioWriteIF(uint8_t data);
+	void ioWriteLY(uint8_t data);
 
 	void ioIncrementDIV();
 	void ioIncrementTIMA();
+	void ioIncrementLY();
 
 	void setInterruptVBlank();
 

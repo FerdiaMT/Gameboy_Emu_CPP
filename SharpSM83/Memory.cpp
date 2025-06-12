@@ -415,6 +415,11 @@ uint8_t Memory::ioFetchLY()
 	return io[0x44];
 }
 
+void Memory::ioIncrementLY()
+{
+	io[0x44]++;
+}
+
 void Memory::ioWriteJOYP(uint8_t data)
 {
 	io[0x0] = data;
@@ -455,10 +460,16 @@ void Memory::ioWriteIF(uint8_t data)
 	io[0xF] = data;
 }
 
+void Memory::ioWriteLY(uint8_t data)
+{
+	io[0x44] = data;
+}
+
 void Memory::ioIncrementDIV()
 {
 	io[0x4]++;
 }
+
 
 void Memory::ioIncrementTIMA()
 {

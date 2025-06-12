@@ -391,6 +391,12 @@ int main()
         clock.handleTimers(allCycles);
 
         ppu.executeTick(allCycles);
+        ppu.executeTick(allCycles);
+        ppu.executeTick(allCycles);
+        ppu.executeTick(allCycles);
+
+
+
 
         while (SDL_PollEvent(&event))
         {
