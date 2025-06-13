@@ -30,6 +30,8 @@ public:
 	uint8_t ioFetchTAC();
 	uint8_t ioFetchIF();
 	uint8_t ioFetchLCDC();
+	uint8_t ioFetchSCY();
+	uint8_t ioFetchSCX();
 
 	uint8_t ioFetchLY();
 

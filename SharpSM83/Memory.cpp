@@ -410,6 +410,16 @@ uint8_t Memory::ioFetchLCDC()
 	return io[0x40];
 }
 
+uint8_t Memory::ioFetchSCY()
+{
+	return io[0x42];
+}
+uint8_t Memory::ioFetchSCX()
+{
+	return io[0x43];
+}
+
+
 uint8_t Memory::ioFetchLY()
 {
 	return io[0x44];

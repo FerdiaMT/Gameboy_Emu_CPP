@@ -238,27 +238,15 @@ void drawAllPixels(Memory& memory)
 static void drawMapA(Memory& memory)
 {
     uint8_t c = 0;
-    uint16_t level = 0x9800; // this can also be 9c00 // goes up to 9bFF // 9800
-
-    //32 * 32 tiles , increase per bit
-
-
-
-    for (int th = 0; th < 32; th++) {
-        for (int tw = 0; tw < 32; tw++) {
-           // std::cout << std::hex << (level + tw + (th * 32)) << std::endl;
-            
-            uint16_t tileAddr = (memory.readPPU((level + tw + (th * 32))) * 0x10);
-           // std::cout << std::hex << tileAddr << std::endl;
-
-
+    uint16_t memAdress = 0x9800; // this can also be 9c00 // goes up to 9bFF // 9800
+    uint16_t memAdress2 = 0x8000;
+    for (int ty = 0; ty < 32; ty++) {
+        for (int tx = 0; tx < 32; tx++) {
+            uint16_t tileNumber = (memory.readPPU((memAdress + tx + (ty * 32))) * 0x10);
             for (int y = 0; y < 8; y++) {
 
-                //uint8_t row1 = memory.readPPU((y * 2) + tileAddr); // tile INdex A
-                //uint8_t row2 = memory.readPPU((y * 2) + tileAddr+1); // tile Index B
-
-                uint8_t row1 = memory.readPPU(0x8000 + tileAddr + (y * 2));
-                uint8_t row2 = memory.readPPU(0x8000 + tileAddr + (y * 2));
+                uint8_t row1 = memory.readPPU(memAdress2 + tileNumber + (y * 2));
+                uint8_t row2 = memory.readPPU(memAdress2 + tileNumber + (y * 2));
 
                 for (int x = 0; x < 8; x++) {
 
@@ -273,7 +261,7 @@ static void drawMapA(Memory& memory)
                     }
 
                     SDL_SetRenderDrawColor(renderer3, c, c, c, 255);
-                    SDL_FRect pixel2 = { (SCALE * tw * 8) + (x * SCALE),  (SCALE * th * 8) + (y * SCALE), SCALE, SCALE };//x,y,w,h
+                    SDL_FRect pixel2 = { (SCALE * tx * 8) + (x * SCALE),  (SCALE * ty * 8) + (y * SCALE), SCALE, SCALE };//x,y,w,h
                     SDL_RenderFillRect(renderer3, &pixel2);
                 }
               
@@ -346,7 +334,7 @@ int main()
     //DEBUGS TO GET WORKING: -, 2, - , - , - , - , 7 , -, - , - , -
     std::ifstream file("04-op.gb", std::ios::binary | std::ios::ate);
 
-    bool skipBootROM = false; 
+    bool skipBootROM = true; 
 
     if (file.is_open())
     {
@@ -444,6 +432,7 @@ int main()
             ppu.updateScreenBuffer(pixelState);
             drawAllPixels(memory);
 
+
             //drawTextureWindow(memory);
 
             
@@ -460,10 +449,10 @@ int main()
 
         clock.handleTimers(allCycles);
 
-        //ppu.executeTick(allCycles);
-        //ppu.executeTick(allCycles);
-        //ppu.executeTick(allCycles);
-        //ppu.executeTick(allCycles);
+        ppu.executeTick(allCycles);
+        ppu.executeTick(allCycles);
+        ppu.executeTick(allCycles);
+        ppu.executeTick(allCycles);
 
 
 
