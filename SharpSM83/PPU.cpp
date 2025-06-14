@@ -91,6 +91,8 @@ uint16_t testX = 0;
 uint8_t tx{};
 uint8_t ty{};
 
+uint8_t tempScrollY = 5;
+
 void PPU::fetchTileNo()
 {
 	//these 2 give us the coordinates of the visible portion of the map
@@ -104,15 +106,14 @@ void PPU::fetchTileNo()
 	{
 		memAddr = 0x9800;
 	}
+	///fetcherX
 
-
-	 tx = (scrollX + fetcherX)/ 8;
-	 ty = (scrollY + memory.ioFetchLY()) / 8;
+	 tx = (( scrollX + fetcherX)%256)/ 8;
+	 ty = ((tempScrollY + memory.ioFetchLY())%256) / 8;
 	 
-	 uint16_t finalAddr = memAddr ;
-	 tileNumber = ((memory.readPPU(finalAddr)));
+	 uint16_t finalAddr = memAddr;
 
-	 //printf("fetcherX:%d tx:%d finalAddr:%04X tile:%02X\n",fetcherX, tx, finalAddr, tileNumber);
+	 tileNumber = ((memory.readPPU(finalAddr+ tx + ty*32)));
 }
 
 uint8_t tileDataA{};
@@ -121,13 +122,13 @@ uint8_t tileDataB{};
 void PPU:: fetchTileL()
 {
 
-	uint8_t fineY = (memory.ioFetchLY() + memory.ioFetchSCY()) % 8;
+	uint8_t fineY = ((memory.ioFetchLY() + tempScrollY)%256) % 8;
 
 
 	if (memory.ioFetchLCDC() & 0b10000)
 	{
 		memAddr = 0x8000;
-		tileDataA = memory.readPPU( memAddr + (tileNumber * 0x10) + fineY *2);
+		tileDataA = memory.readPPU( memAddr + (tileNumber * 0x10) + (fineY *2) );
 	}
 	else
 	{ //8800 mode
@@ -140,12 +141,12 @@ void PPU:: fetchTileL()
 void PPU::fetchTileH()
 {
 
-	uint8_t fineY = (memory.ioFetchLY() + memory.ioFetchSCY()) % 8;
+	uint8_t fineY = ((memory.ioFetchLY() + tempScrollY) % 256) % 8;
 
 	if (memory.ioFetchLCDC() & 0b10000)
 	{
 		memAddr = 0x8000;
-		tileDataB = memory.readPPU(1+memAddr + (tileNumber * 0x10) + fineY * 2);
+		tileDataB = memory.readPPU(1+memAddr + (tileNumber * 0x10) + (fineY * 2));
 	}
 	else
 	{ //8800 mode
@@ -161,13 +162,12 @@ bool pixelOutputMode = false;
 
 
 void PPU::fifoPush() {
-	//printf("Pushing tile %02X (Data: %02X %02X)\n",tileNumber, tileDataA, tileDataB); // DEBUG
 
 	for (int x = 7; x >= 0; x--) {
-		uint8_t pixel = ((tileDataB >> x) & 1) << 1 | ((tileDataA >> x) & 1);
+		uint8_t pixel = ((tileDataB >> x) & 0b1) << 1 | ((tileDataA >> x) & 0b1);
 		backgroundFifo.push(pixel);
 	}
-	//tileFetcherFinished = true;
+	tileFetcherFinished = true;
 }
 
 uint8_t twelveDot{};
@@ -185,21 +185,12 @@ void PPU::tileFetcher()
 			fetchTileNo();
 			fetchTileL();
 			fetchTileH();
+			fifoPush();
 			fifoCanPush = true;
 		}
 		fetcherX++;
 	}
-	else
-	{
-		tileFetcherFinished = true;
-	}
 
-	if (backgroundFifo.empty())
-	{
-
-		fifoPush();
-		fifoCanPush = false;
-	}
 
 }
 
@@ -208,9 +199,9 @@ uint8_t internalX{};
 void PPU::drawPixel()
 {
 
-	if (internalX < 163 &&internalX >= 3)  // Only draw visible pixels
+	if (internalX < 160 )  // Only draw visible pixels
 	{
-		screen[internalX-3][memory.ioFetchLY()] = backgroundFifo.front();
+		screen[internalX][memory.ioFetchLY()] = backgroundFifo.front();
 	}
 	backgroundFifo.pop();
 
@@ -230,24 +221,23 @@ void PPU::mode3Tick()
 		pixelOutputMode = true;
 		tileFetcherFinished = false;
 	}
-	if (pixelOutputMode)
+		if (pixelOutputMode)
 	{
 		if (!backgroundFifo.empty())
 		{
 			drawPixel();
-
+			
 		}
-		else {
+		else{
 			pixelOutputMode = false;
 		}
 	}
-
 
 }
 
 void resetVals()
 {
-	internalX = 0;
+	
 	twelveDot = 0;
 
 }
@@ -294,7 +284,9 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 		if (internalDot >= 456) { // end of scanline
 			internalDot = 0;
 			memory.ioIncrementLY();
+			while (!backgroundFifo.empty()) backgroundFifo.pop();
 			fetcherX = 0;
+			internalX = 0;
 		}
 	}
 
