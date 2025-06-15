@@ -202,31 +202,57 @@ void drawTextureWindow(Memory& memory) // going to use this to draw out the text
     
 }
 
-void drawAllPixels(Memory& memory)
-{
-    for (uint8_t x = 0; x < WIDTH; x++)
-    {
-        for (uint8_t y = 0; y < HEIGHT; y++)
-        {
-            if (pixelState[x][y] == 0b11)
-            {
-                char c = 0;
+static SDL_Texture* pixelTexture = nullptr;
+static uint32_t* pixelBuffer = nullptr;
+static bool pixelRendererInitialized = false;
 
-                SDL_SetRenderDrawColor(renderer, c, c, c, 255);
-                SDL_FRect pixel = { x * SCALE, y * SCALE, SCALE, SCALE };//x,y,w,h
-                SDL_RenderFillRect(renderer, &pixel);
-            }
-            else
-            {
-                char c = 255 - (pixelState[x][y] * 100);
+bool initPixelRenderer(SDL_Renderer* renderer) {
 
-                SDL_SetRenderDrawColor(renderer, c, c, c, 255);
-                SDL_FRect pixel = { x * SCALE, y * SCALE, SCALE, SCALE };//x,y,w,h
-                SDL_RenderFillRect(renderer, &pixel);
-            }
-        }
+    if (pixelRendererInitialized) {
+        if (pixelTexture) SDL_DestroyTexture(pixelTexture);
+        if (pixelBuffer) delete[] pixelBuffer;
     }
 
+    pixelTexture = SDL_CreateTexture(
+        renderer,
+        SDL_PIXELFORMAT_RGBA8888,
+        SDL_TEXTUREACCESS_STREAMING,
+        WIDTH,
+        HEIGHT
+    );
+    SDL_SetTextureScaleMode(pixelTexture, SDL_SCALEMODE_NEAREST);
+    pixelBuffer = new uint32_t[WIDTH * HEIGHT];
+    //for (int i = 0; i < WIDTH * HEIGHT; i++) {
+    //    pixelBuffer[i] = 0xFFFFFFFF;
+    //}
+    pixelRendererInitialized = true;
+    return true;
+}
+
+static const uint32_t colors[4] = {
+    0xFFFFFFFF,
+    0x9B9B9BFF,
+    0x373737FF,
+    0x000000FF
+};
+
+
+void drawAllPixels(Memory& memory) {
+
+
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            pixelBuffer[y * WIDTH + x] = colors[pixelState[x][y]];
+        }
+    }
+    SDL_UpdateTexture(pixelTexture, nullptr, pixelBuffer, WIDTH * sizeof(uint32_t));
+    SDL_FRect destRect = {
+        0.0f, 0.0f,
+        static_cast<float>(WIDTH * SCALE),
+        static_cast<float>(HEIGHT * SCALE)
+    };
+
+    SDL_RenderTexture(renderer, pixelTexture, nullptr, &destRect);
     SDL_RenderPresent(renderer);
 }
 
@@ -407,6 +433,12 @@ int main()
     auto lastCycleTime = std::chrono::high_resolution_clock::now();
 
     bool renderFrame = false;
+
+    if (!initPixelRenderer(renderer)) {
+        // Handle error - maybe exit the program
+        printf("Failed to initialize pixel renderer!\n");
+        return 1;
+    }
 
     while(running)
     {
