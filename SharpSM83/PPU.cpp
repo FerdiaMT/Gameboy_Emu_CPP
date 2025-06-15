@@ -14,6 +14,8 @@ std::queue<uint8_t> backgroundFifo{};
 std::queue<uint8_t>  spriteFifo{};
 uint8_t screen[160][144];
 
+uint8_t currentLY{};
+
 
 // resource used -> https://hacktix.github.io/GBEDG/ppu/#oam-scan-mode-2
 
@@ -56,7 +58,7 @@ void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE
 	{
 		uint8_t oamY = memory.readPPU(searchAddr);
 
-		if (memory.ioFetchLY() == oamY && curItemsOnScanline <=10)
+		if (currentLY == oamY && curItemsOnScanline <=10)
 		{
 			curItemsOnScanline++;
 
@@ -86,18 +88,14 @@ uint8_t screenY{};
 uint16_t memAddr{};
 uint16_t tileNumber{};
 
-uint16_t testX = 0;
+uint8_t bgx{};
+uint8_t bgy{};
 
-uint8_t tx{};
-uint8_t ty{};
 
-uint8_t tempScrollY = 5;
 
 void PPU::fetchTileNo()
 {
 	//these 2 give us the coordinates of the visible portion of the map
-	uint8_t scrollX = memory.ioFetchSCX();
-	uint8_t scrollY = memory.ioFetchSCY();
 	if ((memory.ioFetchLCDC() & 0b1000))
 	{
 		memAddr = 0x9C00;
@@ -106,14 +104,11 @@ void PPU::fetchTileNo()
 	{
 		memAddr = 0x9800;
 	}
-	///fetcherX
 
-	 tx = (( scrollX + fetcherX)%256)/ 8;
-	 ty = ((tempScrollY + memory.ioFetchLY())%256) / 8;
+	bgx = (memory.ioFetchSCX() + fetcherX) % 256;
+	bgy = (memory.ioFetchSCY() + currentLY) % 256;
 	 
-	 uint16_t finalAddr = memAddr;
-
-	 tileNumber = ((memory.readPPU(finalAddr+ tx + ty*32)));
+	tileNumber = (memory.readPPU(memAddr + (bgx / 8) + ((bgy / 8) *32) ));
 }
 
 uint8_t tileDataA{};
@@ -122,7 +117,7 @@ uint8_t tileDataB{};
 void PPU:: fetchTileL()
 {
 
-	uint8_t fineY = ((memory.ioFetchLY() + tempScrollY)%256) % 8;
+	uint8_t fineY = (bgy) % 8;
 
 
 	if (memory.ioFetchLCDC() & 0b10000)
@@ -133,7 +128,7 @@ void PPU:: fetchTileL()
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataA = memory.readPPU(memAddr + ((int8_t)tileNumber*16) + memory.ioFetchLY() * 2);
+		tileDataA = memory.readPPU(memAddr + ((int8_t)tileNumber*16) + currentLY * 2);
 
 	}
 }
@@ -141,7 +136,7 @@ void PPU:: fetchTileL()
 void PPU::fetchTileH()
 {
 
-	uint8_t fineY = ((memory.ioFetchLY() + tempScrollY) % 256) % 8;
+	uint8_t fineY = (bgy) % 8;
 
 	if (memory.ioFetchLCDC() & 0b10000)
 	{
@@ -151,7 +146,7 @@ void PPU::fetchTileH()
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataB = memory.readPPU(1+memAddr + ((int8_t)tileNumber * 16) + memory.ioFetchLY() * 2);
+		tileDataB = memory.readPPU(1+memAddr + ((int8_t)tileNumber * 16) + currentLY * 2);
 	}
 }
 
@@ -164,8 +159,7 @@ bool pixelOutputMode = false;
 void PPU::fifoPush() {
 
 	for (int x = 7; x >= 0; x--) {
-		uint8_t pixel = ((tileDataB >> x) & 0b1) << 1 | ((tileDataA >> x) & 0b1);
-		backgroundFifo.push(pixel);
+		backgroundFifo.push(((tileDataB >> x) & 0b1) << 1 | ((tileDataA >> x) & 0b1));
 	}
 	tileFetcherFinished = true;
 }
@@ -176,9 +170,6 @@ uint8_t fetcherState{};
 
 void PPU::tileFetcher()
 {
-
-
-
 	if (fetcherX < 168) {
 		if (fetcherX % 8 == 0)
 		{
@@ -189,6 +180,9 @@ void PPU::tileFetcher()
 			fifoCanPush = true;
 		}
 		fetcherX++;
+	}
+	else {
+		mode3Complete == true;
 	}
 
 
@@ -201,7 +195,7 @@ void PPU::drawPixel()
 
 	if (internalX < 160 )  // Only draw visible pixels
 	{
-		screen[internalX][memory.ioFetchLY()] = backgroundFifo.front();
+		screen[internalX][currentLY] = backgroundFifo.front();
 	}
 	backgroundFifo.pop();
 
@@ -243,27 +237,27 @@ void resetVals()
 }
 
 
-void PPU::executeTick(int allCycles) // measured in m cycles
+void PPU::executeTick() // measured in m cycles
 {
 	internalDot++;
-	
+	currentLY = memory.ioFetchLY();
 
-	if (memory.ioFetchLY() >= 144)
+	if (currentLY >= 144) // this is a demo
 	{
 		mode1Tick();
 	}
 	else
 	{
-		if (internalDot == 0)
-		{
-			initFrame();
-		}
+		//if (internalDot == 1)
+		//{
+		//	initFrame();
+		//}
 
 		if (internalDot <= 80)
 		{
 			mode2Tick();
 		}
-		else if (internalDot > 80)
+		else 
 		{
 
 			searchAddr = 0xFE00; // for the oam
@@ -282,9 +276,10 @@ void PPU::executeTick(int allCycles) // measured in m cycles
 		}
 
 		if (internalDot >= 456) { // end of scanline
+			initFrame();
 			internalDot = 0;
 			memory.ioIncrementLY();
-			while (!backgroundFifo.empty()) backgroundFifo.pop();
+			//while (!backgroundFifo.empty()) backgroundFifo.pop();
 			fetcherX = 0;
 			internalX = 0;
 		}
@@ -303,7 +298,7 @@ void PPU::mode1Tick() // 10 scanlines of 456 dots
 
 		internalDot = 0;
 
-		if (memory.ioFetchLY() == 153)
+		if (currentLY == 153)
 		{
 			memory.ioWriteLY(0);
 		}

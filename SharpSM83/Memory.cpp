@@ -4,6 +4,8 @@
 #include <iostream>
 
 
+
+
 #define ROM_LB 0x0000
 #define ROM_UB 0x3FFF
 
@@ -59,134 +61,167 @@ MAINTENANCE REQUIRED : REMOVE THE VIEW AND VIEWWORD FUNCTIONS
 * 0xFF00 - 0xFF7F	~	IO //DMA INSIDE HERE 
 * 0xFF80 - 0xFFFE	~ HIGH ram
 */
-Memory::Memory() {};
+Memory::Memory() 
+{
+	initFastMap();
+};
+
+void Memory::initFastMap()
+{
+	for (uint16_t addr = 0x0000; addr <= 0x3FFF; ++addr)
+		fastMap[addr] = &rom[addr];
+	for (uint16_t addr = 0x4000; addr <= 0x7FFF; ++addr)
+		fastMap[addr] = &romBank[addr - 0x4000];
+	for (uint16_t addr = 0x8000; addr <= 0x9FFF; ++addr)
+		fastMap[addr] = &vram[addr - 0x8000];
+	for (uint16_t addr = 0xA000; addr <= 0xBFFF; ++addr)
+		fastMap[addr] = &cartRam[addr - 0xA000];
+	for (uint16_t addr = 0xC000; addr <= 0xDFFF; ++addr)
+		fastMap[addr] = &wram[addr - 0xC000];
+	for (uint16_t addr = 0xE000; addr <= 0xFDFF; ++addr)
+		fastMap[addr] = &wram[addr - 0xE000];
+	for (uint16_t addr = 0xFE00; addr <= 0xFE9F; ++addr)
+		fastMap[addr] = &oam[addr - 0xFE00];
+	for (uint16_t addr = 0xFF00; addr <= 0xFF7F; ++addr)
+		fastMap[addr] = &io[addr - 0xFF00];
+	for (uint16_t addr = 0xFF80; addr <= 0xFFFE; ++addr)
+		fastMap[addr] = &hram[addr - 0xFF80];
+
+	static uint8_t ieReg = 0;
+	fastMap[0xFFFF] = &ieReg;
+}
+
+
+
 uint8_t Memory::read(uint16_t address) // adress auto increment
 {
-	//	ANYTHING WITH THE WORDS ROM OR CART SHOULD BE ABSTRACTED AWAY IN THE FUTURE 
+	return *fastMap[address];
 
-	if (address <= ROM_UB)
-	{
-		return rom[address];
-	}
-	else if (address <= ROMBANK_UB)
-	{
-		return romBank[address - ROMBANK_LB];
-	}
-	else if (address <= VRAM_UB)
-	{
-		if (vramLocked)
-		{
-			return 0xFF;
-		}
-		else
-		{
-			return vram[address - VRAM_LB];
-		}
-	}
-	else if (address <= CARTRAM_UB)
-	{
-		return cartRam[address - CARTRAM_LB];
-	}
-	else if (address <= WRAM_UB)
-	{
-		return wram[address - WRAM_LB];
-	}
-	else if (address <= OAM_UB)
-	{
-		if (vramLocked) return 0xFF;
-		if (-1/*OAM_DMA_ACTIVE*/)
-		{
-			return 0xFF; // return junk if OAM DMA is currenlty active
-		}
-		else 
-		{
-			uint8_t temp = oam[address - OAM_LB];
-			address++;
-			return temp;
-		}
-	}
-	else if (address <= IO_UB) // i should have no return
-	{
+	//if (address <= ROM_UB)
+	//{
+	//	return rom[address];
+	//}
+	//else if (address <= ROMBANK_UB)
+	//{
+	//	return romBank[address - ROMBANK_LB];
+	//}
+	//else if (address <= VRAM_UB)
+	//{
+	//	if (vramLocked)
+	//	{
+	//		return 0xFF;
+	//	}
+	//	else
+	//	{
+	//		return vram[address - VRAM_LB];
+	//	}
+	//}
+	//else if (address <= CARTRAM_UB)
+	//{
+	//	return cartRam[address - CARTRAM_LB];
+	//}
+	//else if (address <= WRAM_UB)
+	//{
+	//	return wram[address - WRAM_LB];
+	//}
+	//else if (address <= OAM_UB)
+	//{
+	//	if (vramLocked) return 0xFF;
+	//	if (-1/*OAM_DMA_ACTIVE*/)
+	//	{
+	//		return 0xFF; // return junk if OAM DMA is currenlty active
+	//	}
+	//	else 
+	//	{
+	//		uint8_t temp = oam[address - OAM_LB];
+	//		address++;
+	//		return temp;
+	//	}
+	//}
+	//else if (address <= IO_UB) // i should have no return
+	//{
 
-		if (address == 0xFF46)
-		{
-			0x00;
-		}
-		else {
-			return io[address - IO_LB];
-		}
-		
-	}
-	else if (address <= HR_UB)
-	{
-		return hram[address - HR_LB];
-	}
-	else
-	{
-		//something went really wrong if it gets to here
-		return 0;
-	}
+	//	if (address == 0xFF46)
+	//	{
+	//		0x00;
+	//	}
+	//	else {
+	//		return io[address - IO_LB];
+	//	}
+	//	
+	//}
+	//else if (address <= HR_UB)
+	//{
+	//	return hram[address - HR_LB];
+	//}
+	//else
+	//{
+	//	//something went really wrong if it gets to here
+	//	return 0;
+	//}
 }
 
 uint8_t Memory::readPPU(uint16_t address) // adress auto increment
 {
-	//	ANYTHING WITH THE WORDS ROM OR CART SHOULD BE ABSTRACTED AWAY IN THE FUTURE 
 
-	if (address <= ROM_UB)
-	{
-		return rom[address];
-	}
-	else if (address <= ROMBANK_UB)
-	{
-		return romBank[address - ROMBANK_LB];
-	}
-	else if (address <= VRAM_UB)
-	{
-		return vram[address - VRAM_LB];
-	}
-	else if (address <= CARTRAM_UB)
-	{
-		return cartRam[address - CARTRAM_LB];
-	}
-	else if (address <= WRAM_UB)
-	{
-		return wram[address - WRAM_LB];
-	}
-	else if (address <= OAM_UB)
-	{
-		if (vramLocked) return 0xFF;
-		if (-1/*OAM_DMA_ACTIVE*/)
-		{
-			return 0xFF; // return junk if OAM DMA is currenlty active
-		}
-		else
-		{
-			uint8_t temp = oam[address - OAM_LB];
-			address++;
-			return temp;
-		}
-	}
-	else if (address <= IO_UB) // i should have no return
-	{
+	return *fastMap[address];
 
-		if (address == 0xFF46)
-		{
-			0x00;
-		}
-		else {
-			return io[address - IO_LB];
-		}
 
-	}
-	else if (address <= HR_UB)
-	{
-		return hram[address - HR_LB];
-	}
-	else
-	{
-		//something went really wrong if it gets to here
-		return 0;
-	}
+	//if (address <= ROM_UB)
+	//{
+	//	return rom[address];
+	//}
+	//else if (address <= ROMBANK_UB)
+	//{
+	//	return romBank[address - ROMBANK_LB];
+	//}
+	//else if (address <= VRAM_UB)
+	//{
+	//	return vram[address - VRAM_LB];
+	//}
+	//else if (address <= CARTRAM_UB)
+	//{
+	//	return cartRam[address - CARTRAM_LB];
+	//}
+	//else if (address <= WRAM_UB)
+	//{
+	//	return wram[address - WRAM_LB];
+	//}
+	//else if (address <= OAM_UB)
+	//{
+	//	if (vramLocked) return 0xFF;
+	//	if (-1/*OAM_DMA_ACTIVE*/)
+	//	{
+	//		return 0xFF; // return junk if OAM DMA is currenlty active
+	//	}
+	//	else
+	//	{
+	//		uint8_t temp = oam[address - OAM_LB];
+	//		address++;
+	//		return temp;
+	//	}
+	//}
+	//else if (address <= IO_UB) // i should have no return
+	//{
+
+	//	if (address == 0xFF46)
+	//	{
+	//		0x00;
+	//	}
+	//	else {
+	//		return io[address - IO_LB];
+	//	}
+
+	//}
+	//else if (address <= HR_UB)
+	//{
+	//	return hram[address - HR_LB];
+	//}
+	//else
+	//{
+	//	//something went really wrong if it gets to here
+	//	return 0;
+	//}
 }
 
 uint16_t Memory::readWord(uint16_t address)

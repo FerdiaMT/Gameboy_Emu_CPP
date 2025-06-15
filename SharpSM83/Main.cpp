@@ -204,31 +204,26 @@ void drawTextureWindow(Memory& memory) // going to use this to draw out the text
 
 void drawAllPixels(Memory& memory)
 {
-    for (int x = 0; x < WIDTH; x++)
+    for (uint8_t x = 0; x < WIDTH; x++)
     {
-        for (int y = 0; y < HEIGHT; y++)
+        for (uint8_t y = 0; y < HEIGHT; y++)
         {
-            int c{};
-            switch (pixelState[x][y]) // each of these can be either 0,1,2 or 3 (11 - white, 10 - 33%, 01 - 66%, 00 = 100%)
+            if (pixelState[x][y] == 0b11)
             {
-            case(0b11): {
-                c = 0;
-            }break;
-            case(0b10): {
-                c = 60;
-            }break;
-            case(0b01): {
-                c = 190;
-            }break;
-            case(0): {
-                c = 255; // black
-            }break;
+                char c = 0;
 
+                SDL_SetRenderDrawColor(renderer, c, c, c, 255);
+                SDL_FRect pixel = { x * SCALE, y * SCALE, SCALE, SCALE };//x,y,w,h
+                SDL_RenderFillRect(renderer, &pixel);
             }
-            
-            SDL_SetRenderDrawColor(renderer, c, c,c, 255);
-            SDL_FRect pixel = { x * SCALE, y * SCALE, SCALE, SCALE };//x,y,w,h
-            SDL_RenderFillRect(renderer, &pixel);
+            else
+            {
+                char c = 255 - (pixelState[x][y] * 100);
+
+                SDL_SetRenderDrawColor(renderer, c, c, c, 255);
+                SDL_FRect pixel = { x * SCALE, y * SCALE, SCALE, SCALE };//x,y,w,h
+                SDL_RenderFillRect(renderer, &pixel);
+            }
         }
     }
 
@@ -332,9 +327,9 @@ int main()
     clock.resetClock();
    
     //DEBUGS TO GET WORKING: -, 2, - , - , - , - , 7 , -, - , - , -
-    std::ifstream file("04-op.gb", std::ios::binary | std::ios::ate);
+    std::ifstream file("cpu_instrs.gb", std::ios::binary | std::ios::ate);
 
-    bool skipBootROM = true; 
+    bool skipBootROM = false; 
 
     if (file.is_open())
     {
@@ -401,8 +396,8 @@ int main()
     }
 
     setupSDL();
-    //setupSDL2();
-    setupSDL3(); // <- map viewer
+    //setupSDL2(); //<- textureviewer
+    //setupSDL3(); // <- map viewer
     SDL_Event event;
 
     //going to do this without the whole clock class for now
@@ -417,30 +412,31 @@ int main()
     {
 
         auto currentTime = std::chrono::high_resolution_clock::now();
-        float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
+        //float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
         
-        if (dt >= 500/*16.73*/) // once every 60 seconds (16.73 milliseconds)
+        if (allCycles >= 17573)//dt >= 16.73/*16.73*/) // once every 60 seconds (16.73 milliseconds)
         {
-            int waitCycle = allCycles - 17573;
-            if (waitCycle > 0)
-            {
-                using namespace std::chrono_literals;
-                //for each cycle too fast, wait 952ns
-                auto wait = (waitCycle) * 952ns;
-                std::this_thread::sleep_for(wait);
-            }
+            //int waitCycle = allCycles - 17573;
+            //if (waitCycle > 0)
+            //{
+            //    using namespace std::chrono_literals;
+            //    //for each cycle too fast, wait 952ns
+            //    auto wait = (waitCycle) * 952ns;
+            //    std::this_thread::sleep_for(wait);
+            //}
+
+
+
             ppu.updateScreenBuffer(pixelState);
             drawAllPixels(memory);
 
+            std::cout << 1000/(std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count()) << std::endl;
 
-            //drawTextureWindow(memory);
-
-            
-           
             lastCycleTime = currentTime;
             allCycles = 0;
-            cpu.cycles = 0; // i know this is bad practice, but this is just demoing my idea
-            drawMapA(memory);
+            cpu.cycles = 0; //<- need to do this properly
+
+            //drawMapA(memory);
         }
 
         allCycles++;
@@ -449,13 +445,7 @@ int main()
 
         clock.handleTimers(allCycles);
 
-        ppu.executeTick(allCycles);
-        ppu.executeTick(allCycles);
-        ppu.executeTick(allCycles);
-        ppu.executeTick(allCycles);
-
-
-
+        ppu.executeTick();
 
         while (SDL_PollEvent(&event))
         {
@@ -469,7 +459,6 @@ int main()
             }
         }
 
-       // SDL_Delay(1000);
     }
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

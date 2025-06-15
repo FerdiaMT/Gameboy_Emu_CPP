@@ -1543,14 +1543,11 @@ void SM83::execute(uint8_t opcode)
 			addCycle();
 			reg.PC += offset;
 		}
-		//std::cout << "offset is " << (int)offset << " with pc now equal to " << int(reg.PC) << std::endl;
 	}break;
 	case 0x21: { // load into bc, n16
 		reg.HL = memory.readWord(reg.PC); reg.PC+=2;
 	}break;
 	case 0x22: { // write into address BC, A
-		//std::cout << "Wrinting " << std::hex << (int)reg.HL << " into " << std::hex << (int)reg.A << std::endl;
-
 		memory.write(reg.HL, reg.A);
 		reg.HL++;
 	}break;
@@ -2217,7 +2214,6 @@ void SM83::execute(uint8_t opcode)
 		uint8_t opcodeCB = memory.read(reg.PC);  reg.PC++;
 		//minimum added cycle of 8 by the looks of things
 		addCycle(2); //(does this include that fetch ?)
-		//std::cout << (int)opcodeCB << " Is the opcode Cb val" << std::endl;
 		executePrefix(opcodeCB);
 	} break;
 	case 0xCC: {
@@ -2377,7 +2373,6 @@ void SM83::execute(uint8_t opcode)
 		uint8_t offset = memory.read(reg.PC++);
 		uint16_t io_addr = 0xFF00 + offset;
 		reg.A = memory.read(io_addr);
-		//std::cout << (int)reg.A << std::endl;
 	} break;
 	case 0xF1: {
 		uint16_t val = popStack();
@@ -2455,14 +2450,8 @@ void SM83::reset()
 
 void SM83::handleInterrupts()
 {
-	if (!IME)
-	{
-		return; // check is interrupt requested
-	}
 	uint8_t IF = memory.ioFetchIF();
-	if (!IF)return;
 	uint8_t IE = memory.read(0xFF0F);
-	if (!IE)return;
 
 	if (IF & 0b1 && IE & 0b1) //bit0 vBlank
 	{
@@ -2512,53 +2501,21 @@ void SM83::handleInterrupts()
 
 uint8_t SM83::executeInstruction()
 {
-
-
 	uint8_t opcode = memory.read(reg.PC); //fetch
 
-
-	//std::cout << std::hex << (int)opcode << "   $" << std::hex << (int)reg.PC << std::endl;
-	//std::cout <<"E: " << (int)reg.E<<"   "<< "zFlag:"<< isZeroFlag() << " C :" << (int)reg.Cstd::cout << std::hex << (int)opcode << std::endl;
 	reg.PC++;
 
 	execute(opcode); // decode - execute
-	
-	handleInterrupts();
-
-	//std::cout <<"A : " << (int)reg.A <<"   ";
-	//std::cout <<"BC: " << (int)reg.BC<<"   ";
-	
-	//std::cout <<"HL: " << (int)reg.HL << "   ";
-	//std::cout << std::endl;
-	//std::cout << "8000: " << std::hex << (int)memory.read(0x8000);
-	//std::cout << "  8001: " << std::hex << (int)memory.read(0x8001);
-	//std::cout << "  8002: " << std::hex << (int)memory.read(0x8002);
-	//std::cout << "  8003: " << std::hex << (int)memory.read(0x8003);
-	//std::cout << "  8004: " << std::hex << (int)memory.read(0x8004);
-	//std::cout << "  8005: " << std::hex << (int)memory.read(0x8005);
-	//std::cout << "  8006: " << std::hex << (int)memory.read(0x8006);
-	//std::cout << "  8007: " << std::hex << (int)memory.read(0x8007);
-	//std::cout << "  8008: " << std::hex << (int)memory.read(0x8008);
-	//std::cout << std::endl;
-
-	 
-	//std::cout << "LY: " << (int)memory.read(0xFF44) << std::endl;
-	//for (int i = 0; i < 20; i++) {
-	//	int a = (int)memory.read(0x8000 + i);
-	//	if (a != 0 && a != 0xFF)
-	//	{
-	//		std::cout << std::hex << a;
-	//	}
-	//}
-
-	//std::cout << std::endl;
-
+	if (IME && memory.ioFetchIF() && memory.read(0xFF0F))
+	{
+		handleInterrupts();
+	}
 	return opcodeCycles[opcode];
 }
 
 void SM83::executeCycle(double cyclesAvailable)
 {
-	while (cycles < cyclesAvailable)
+	//while (cycles < cyclesAvailable)
 	{
 		if (memory.dmaPending) {
 			cycles += 160;

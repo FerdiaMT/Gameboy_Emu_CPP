@@ -10,7 +10,7 @@ public:
 	PPU(Memory& memory);
 	void resetPPU();
 
-	void executeTick(int allCycles);
+	void executeTick();
 
 	void updateScreenBuffer(uint8_t(&mainScreen)[160][144]);
 	

@@ -1,5 +1,7 @@
 #ifndef MEMORY_H
 #define MEMORY_H
+
+#include <array>
 #include <cstdint>
 
 class Memory
@@ -7,6 +9,24 @@ class Memory
 public:
 
 	Memory();
+
+	uint8_t vram[0x2000]{}; // video ram
+	uint8_t wram[0x2000]{}; // work ram
+	uint8_t oam[0xA0]{};	// object attribute memory, for sprites
+	uint8_t io[0x80]{}; //<for cpu commands
+	uint8_t hram[0x7F]{}; //higher ram
+
+	//should move these later but im gonna keep them here (cartidge file)
+
+
+	uint8_t rom[0x4000]{};
+	uint8_t romBank[0x4000]{};
+	uint8_t cartRam[0x2000]{};
+
+	std::array<uint8_t*, 0x10000> fastMap;
+
+	void initFastMap();
+
 
 	uint8_t read(uint16_t address);
 	uint8_t view(uint16_t address); // phase this out
@@ -62,18 +82,7 @@ public:
 
 private:
 
-	uint8_t vram[0x2000]{}; // video ram
-	uint8_t wram[0x2000]{}; // work ram
-	uint8_t oam[0xA0]{};	// object attribute memory, for sprites
-	uint8_t io[0x80]{}; //<for cpu commands
-	uint8_t hram[0x7F]{}; //higher ram
 
-	//should move these later but im gonna keep them here (cartidge file)
-
-
-	uint8_t rom[0x4000]{};
-	uint8_t romBank[0x4000]{};
-	uint8_t cartRam[0x2000]{};
 
 };
-#endif
+#endif // MEMORY_H
