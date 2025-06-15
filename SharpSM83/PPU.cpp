@@ -29,6 +29,40 @@ void PPU::resetPPU()
 
 }
 
+void PPU::writeIntoSTAT(uint8_t mode)
+{
+	uint8_t val = memory.readPPU(0xFF41);
+	val = (val & 0b11111100) | mode;
+	memory.writePPU(0xFF41, val);
+
+	if (mode == 0b00 && ((val & 0b1000) >> 3 == 1)) //mode 0 trigger
+	{
+		uint8_t temp = memory.ioFetchIF();
+		memory.ioWriteIF(temp |= 0b10);
+	}
+	else if (mode == 0b01 && ((val & 0b10000) >> 4 == 1)) //mode 1 trigger
+	{
+		uint8_t temp = memory.ioFetchIF();
+		memory.ioWriteIF(temp |= 0b10);
+	}
+	else if (mode == 0b10 && ((val & 0b100000) >> 5 == 1)) //mode 2 trigger
+	{
+		uint8_t temp = memory.ioFetchIF();
+		memory.ioWriteIF(temp |= 0b10);
+	}
+	else if (mode == 0b11 && ((val & 0b1000000) >> 6 == 1)) //mode 3 trigger
+	{
+		uint8_t temp = memory.ioFetchIF();
+		memory.ioWriteIF(temp |= 0b10);
+	}
+
+	if ((val & 0b100) >> 2 == (val & 0b1000000) >> 6) // LY = LYC
+	{
+		uint8_t temp = memory.ioFetchIF();
+		memory.ioWriteIF(temp |= 0b10);
+	}
+
+}
 
 
 
@@ -52,7 +86,8 @@ void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE
 {
 	if (!mode2Half)
 	{
-		
+
+		searchAddr = 0xFE00; // for the oam
 	}
 	else
 	{
@@ -205,29 +240,33 @@ void PPU::drawPixel()
 
 void PPU::mode3Tick() 
 {
+	tileFetcher();
+	if (!backgroundFifo.empty())
+	{
+		drawPixel();
+	}
+	//if (!tileFetcherFinished)
+	//{
+	//	tileFetcher();
+	//}
+	//else
+	//{
+	//	pixelOutputMode = true;
+	//	tileFetcherFinished = false;
+	//}
 
-	if (!tileFetcherFinished)
-	{
-		tileFetcher();
-	}
-	else
-	{
-		pixelOutputMode = true;
-		tileFetcherFinished = false;
-	}
-		if (pixelOutputMode)
-	{
-		if (!backgroundFifo.empty())
-		{
-			drawPixel();
-			
-		}
-		else{
-			pixelOutputMode = false;
-		}
-	}
+	//if (pixelOutputMode)
+	//{
+	//	if (!backgroundFifo.empty())
+	//	{
+	//		drawPixel();
 
+	//	}
+	//	else {
+	//		pixelOutputMode = false;
+	//	}
 }
+
 
 void resetVals()
 {
@@ -248,29 +287,27 @@ void PPU::executeTick() // measured in m cycles
 	}
 	else
 	{
-		//if (internalDot == 1)
-		//{
-		//	initFrame();
-		//}
-
 		if (internalDot <= 80)
 		{
+			writeIntoSTAT(0b10);
 			mode2Tick();
 		}
 		else 
 		{
 
-			searchAddr = 0xFE00; // for the oam
-
 			//Mode 3 is 172 to 289 dots long
 			if (!mode3Complete)
 			{
 				mode3Tick();
+
+				writeIntoSTAT(0b11);
+
 				mode3Dots++;
 			}
 			else
 			{
 				//mode 0
+				writeIntoSTAT(0b0);
 			}
 
 		}
@@ -291,6 +328,10 @@ void PPU::executeTick() // measured in m cycles
 
 void PPU::mode1Tick() // 10 scanlines of 456 dots
 {
+	writeIntoSTAT(0b1);
+	uint8_t temp = memory.ioFetchIF();
+	memory.ioWriteIF(temp |= 0b1);
+
 	if (internalDot >= 456) 
 	{ 
 

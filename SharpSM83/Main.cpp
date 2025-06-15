@@ -353,7 +353,7 @@ int main()
     clock.resetClock();
    
     //DEBUGS TO GET WORKING: -, 2, - , - , - , - , 7 , -, - , - , -
-    std::ifstream file("cpu_instrs.gb", std::ios::binary | std::ios::ate);
+    std::ifstream file("02.gb", std::ios::binary | std::ios::ate);
 
     bool skipBootROM = false; 
 
@@ -451,10 +451,7 @@ int main()
             //int waitCycle = allCycles - 17573;
             //if (waitCycle > 0)
             //{
-            //    using namespace std::chrono_literals;
-            //    //for each cycle too fast, wait 952ns
-            //    auto wait = (waitCycle) * 952ns;
-            //    std::this_thread::sleep_for(wait);
+
             //}
 
 
@@ -462,7 +459,15 @@ int main()
             ppu.updateScreenBuffer(pixelState);
             drawAllPixels(memory);
 
-            std::cout << 1000/(std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count()) << std::endl;
+            float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
+
+            //std::cout << 1000 / (dt) << std::endl;
+            if (dt < 16.73)
+            {
+                using namespace std::chrono_literals;
+                auto wait = (16.73-dt) * 1ms;
+                std::this_thread::sleep_for(wait);
+            }
 
             lastCycleTime = currentTime;
             allCycles = 0;
@@ -479,17 +484,17 @@ int main()
 
         ppu.executeTick();
 
-        while (SDL_PollEvent(&event))
-        {
-            memset(keyboardState, 0, sizeof(keyboardState));
+        //while (SDL_PollEvent(&event))
+        //{
+        //    memset(keyboardState, 0, sizeof(keyboardState));
 
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            if (event.type == SDL_EVENT_KEY_DOWN) {
-                
-            }
-        }
+        //    if (event.type == SDL_EVENT_QUIT) {
+        //        running = false;
+        //    }
+        //    if (event.type == SDL_EVENT_KEY_DOWN) {
+        //        
+        //    }
+        //}
 
     }
     SDL_DestroyRenderer(renderer);

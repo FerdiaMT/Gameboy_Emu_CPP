@@ -1401,11 +1401,6 @@ void SM83::executePrefix(uint8_t opcode)
 void SM83::execute(uint8_t opcode)
 {
 
-	if (IME_nextCycle)
-	{
-		IME = true;
-		IME_nextCycle = false;
-	}
 
 	switch (opcode) {
 
@@ -2411,7 +2406,7 @@ void SM83::execute(uint8_t opcode)
 		uint16_t tempAddr = memory.readWord(reg.PC); reg.PC+=2;
 		reg.A = memory.read(tempAddr);
 	} break;
-	case 0xFB: { //empty
+	case 0xFB: { 
 		IME_nextCycle = true;
 	} break;
 	case 0xFC: { //empty
@@ -2448,11 +2443,12 @@ void SM83::reset()
 	IME = 0;
 }
 
+
+uint8_t IF{};
+uint8_t IE{};
+
 void SM83::handleInterrupts()
 {
-	uint8_t IF = memory.ioFetchIF();
-	uint8_t IE = memory.read(0xFF0F);
-
 	if (IF & 0b1 && IE & 0b1) //bit0 vBlank
 	{
 		//the corresponding IF bit and IME flag are reset
@@ -2461,7 +2457,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0040);
 		addCycle(5);
-		std::cout << "VBLANK INTERRUPT ======================================" << std::endl;
+		std::cout << "VBLANK INTERRUPT" << std::endl;
 	}
 	if (IF & 0b10 && IE & 0b10) //bit1 LCDstat
 	{
@@ -2469,7 +2465,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0048);
 		addCycle(5);
-		std::cout << "LCD INTERRUPT ======================================" << std::endl;
+		std::cout << "LCD INTERRUPT" << std::endl;
 	}
 	if (IF & 0b100 && IE & 0b100) //bit2 Timer
 	{
@@ -2477,7 +2473,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0050);
 		addCycle(5);
-		std::cout << "TIMER INTERRUPT ======================================" << std::endl;
+		std::cout << "TIMER INTERRUPT" << std::endl;
 	}
 	if (IF & 0b1000 && IE & 0b1000) //bit3 Serial
 	{
@@ -2498,18 +2494,32 @@ void SM83::handleInterrupts()
 }
 
 
-
 uint8_t SM83::executeInstruction()
 {
-	uint8_t opcode = memory.read(reg.PC); //fetch
 
+	if (IME_nextCycle)
+	{
+		IME = true;
+		IME_nextCycle = false;
+	}
+
+
+
+	uint8_t opcode{};
+	uint8_t IF = memory.ioFetchIF();
+	uint8_t IE = memory.read(0xFFFF);
+
+	opcode = memory.read(reg.PC); //fetch
 	reg.PC++;
-
 	execute(opcode); // decode - execute
-	if (IME && memory.ioFetchIF() && memory.read(0xFF0F))
+
+	if (IME && ((IF & IE & 0x1F) != 0))
 	{
 		handleInterrupts();
 	}
+
+
+
 	return opcodeCycles[opcode];
 }
 
