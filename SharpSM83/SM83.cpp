@@ -4,6 +4,10 @@
 #include <unordered_map>
 #include <iostream>
 #include <bitset>
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 
 registers reg;
 
@@ -2489,6 +2493,24 @@ void SM83::handleInterrupts()
 	// mabye do this : addCycle(5);
 }
 
+uint16_t previousOP{};
+
+void SM83::logCPUState() {
+	std::ostringstream oss;
+	oss << std::hex << std::uppercase << std::setfill('0');
+	oss << "A:" << std::setw(2) << static_cast<int>(reg.A) << " " << "F:" << std::setw(2) << static_cast<int>(reg.F) << " ";
+	oss << "B:" << std::setw(2) << static_cast<int>(reg.B) << " " << "C:" << std::setw(2) << static_cast<int>(reg.C) << " ";
+	oss << "D:" << std::setw(2) << static_cast<int>(reg.D) << " " << "E:" << std::setw(2) << static_cast<int>(reg.E) << " ";
+	oss << "H:" << std::setw(2) << static_cast<int>(reg.H) << " " << "L:" << std::setw(2) << static_cast<int>(reg.L) << " ";
+	oss << "SP:" << std::setw(4) << reg.SP << " " << "PC:" << std::setw(4) << static_cast<int>(previousOP) << " ";
+	oss << "PCMEM:" << std::setw(2) << static_cast<int>(memory.readPPU(previousOP)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+1)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+2)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+3));
+
+	std::ofstream file("log.txt", std::ios::app);
+	if (file.is_open()) {
+		file << oss.str() << '\n';
+	}
+}
+
 
 uint8_t SM83::executeInstruction()
 {
@@ -2521,19 +2543,21 @@ uint8_t SM83::executeInstruction()
 		IME = true;
 		IME_nextCycle = false;
 	}
-
+	previousOP = reg.PC;
+	logCPUState();
 	opcode = memory.read(reg.PC); //fetch
 
-	//std::cout << " op: " << std::hex << (int)opcode << " PC :  " << (int)reg.PC << std::endl;
 	reg.PC++;
 	execute(opcode); // decode - execute
+
+	
 
 	return opcodeCycles[opcode];
 }
 
 void SM83::executeCycle(double cyclesAvailable)
 {
-	//while (cycles < cyclesAvailable)
+	while (cycles < cyclesAvailable)
 	{
 		if (memory.dmaPending) {
 			cycles += 160;

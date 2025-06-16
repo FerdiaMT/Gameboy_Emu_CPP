@@ -94,12 +94,17 @@ void Memory::initFastMap()
 
 uint8_t Memory::read(uint16_t address) // adress auto increment
 {
+	if (address == 0xFF44) {
+		return (uint8_t)0x90;
+	}
 	return *fastMap[address];
 }
 
 uint8_t Memory::readPPU(uint16_t address) // adress auto increment
 {
-
+	if (address == 0xFF44) {
+		return (uint8_t)0x90;
+	}
 	return *fastMap[address];
 }
 

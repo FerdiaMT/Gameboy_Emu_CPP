@@ -81,6 +81,7 @@ private:
 	void push(uint16_t pushData);
 	inline void addCycle();
 	inline void addCycle(uint8_t cyclesAdded);
+	void logCPUState();
 
 };
 #endif

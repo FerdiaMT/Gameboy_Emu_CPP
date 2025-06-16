@@ -353,7 +353,7 @@ int main()
     clock.resetClock();
    
     //DEBUGS TO GET WORKING: -, 2 , - , - , - , - , - , -, - , - , - , cpu_instrs
-    std::ifstream file("11-op.gb", std::ios::binary | std::ios::ate);
+    std::ifstream file("07-jr.gb", std::ios::binary | std::ios::ate);
 
     bool skipBootROM = true; 
 
