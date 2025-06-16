@@ -87,8 +87,7 @@ void Memory::initFastMap()
 	for (uint16_t addr = 0xFF80; addr <= 0xFFFE; ++addr)
 		fastMap[addr] = &hram[addr - 0xFF80];
 
-	static uint8_t ieReg = 0;
-	fastMap[0xFFFF] = &ieReg;
+	fastMap[0xFFFF] = &IE;
 }
 
 
@@ -96,132 +95,12 @@ void Memory::initFastMap()
 uint8_t Memory::read(uint16_t address) // adress auto increment
 {
 	return *fastMap[address];
-
-	//if (address <= ROM_UB)
-	//{
-	//	return rom[address];
-	//}
-	//else if (address <= ROMBANK_UB)
-	//{
-	//	return romBank[address - ROMBANK_LB];
-	//}
-	//else if (address <= VRAM_UB)
-	//{
-	//	if (vramLocked)
-	//	{
-	//		return 0xFF;
-	//	}
-	//	else
-	//	{
-	//		return vram[address - VRAM_LB];
-	//	}
-	//}
-	//else if (address <= CARTRAM_UB)
-	//{
-	//	return cartRam[address - CARTRAM_LB];
-	//}
-	//else if (address <= WRAM_UB)
-	//{
-	//	return wram[address - WRAM_LB];
-	//}
-	//else if (address <= OAM_UB)
-	//{
-	//	if (vramLocked) return 0xFF;
-	//	if (-1/*OAM_DMA_ACTIVE*/)
-	//	{
-	//		return 0xFF; // return junk if OAM DMA is currenlty active
-	//	}
-	//	else 
-	//	{
-	//		uint8_t temp = oam[address - OAM_LB];
-	//		address++;
-	//		return temp;
-	//	}
-	//}
-	//else if (address <= IO_UB) // i should have no return
-	//{
-
-	//	if (address == 0xFF46)
-	//	{
-	//		0x00;
-	//	}
-	//	else {
-	//		return io[address - IO_LB];
-	//	}
-	//	
-	//}
-	//else if (address <= HR_UB)
-	//{
-	//	return hram[address - HR_LB];
-	//}
-	//else
-	//{
-	//	//something went really wrong if it gets to here
-	//	return 0;
-	//}
 }
 
 uint8_t Memory::readPPU(uint16_t address) // adress auto increment
 {
 
 	return *fastMap[address];
-
-
-	//if (address <= ROM_UB)
-	//{
-	//	return rom[address];
-	//}
-	//else if (address <= ROMBANK_UB)
-	//{
-	//	return romBank[address - ROMBANK_LB];
-	//}
-	//else if (address <= VRAM_UB)
-	//{
-	//	return vram[address - VRAM_LB];
-	//}
-	//else if (address <= CARTRAM_UB)
-	//{
-	//	return cartRam[address - CARTRAM_LB];
-	//}
-	//else if (address <= WRAM_UB)
-	//{
-	//	return wram[address - WRAM_LB];
-	//}
-	//else if (address <= OAM_UB)
-	//{
-	//	if (vramLocked) return 0xFF;
-	//	if (-1/*OAM_DMA_ACTIVE*/)
-	//	{
-	//		return 0xFF; // return junk if OAM DMA is currenlty active
-	//	}
-	//	else
-	//	{
-	//		uint8_t temp = oam[address - OAM_LB];
-	//		address++;
-	//		return temp;
-	//	}
-	//}
-	//else if (address <= IO_UB) // i should have no return
-	//{
-
-	//	if (address == 0xFF46)
-	//	{
-	//		0x00;
-	//	}
-	//	else {
-	//		return io[address - IO_LB];
-	//	}
-
-	//}
-	//else if (address <= HR_UB)
-	//{
-	//	return hram[address - HR_LB];
-	//}
-	//else
-	//{
-	//	//something went really wrong if it gets to here
-	//	return 0;
-	//}
 }
 
 uint16_t Memory::readWord(uint16_t address)
@@ -314,8 +193,13 @@ void Memory::write(uint16_t address, uint8_t data)
 	{
 		hram[address - HR_LB] = data;
 	}
+	else if (address == 0xFFFF)
+	{
+		 IE = data;
+	}
 	else
 	{
+		std::cout << "TRIED TO WRITE TO" <<std::hex <<  (int)address << std::endl;
 		//something went really wrong if it gets to here
 	}
 
@@ -378,8 +262,12 @@ void Memory::writePPU(uint16_t address, uint8_t data)
 	{
 		hram[address - HR_LB] = data;
 	}
+	else if (address == 0XFFFF) {
+		IE = data;
+	}
 	else
 	{
+		std::cout << "TRIED TO WRITE TO" << (int)address << std::endl;
 		//something went really wrong if it gets to here
 	}
 
@@ -439,6 +327,12 @@ uint8_t Memory::ioFetchIF()
 {
 	return io[0x0F];
 }
+
+uint8_t Memory::ioFetchIE()
+{
+	return IE;
+}
+
 
 uint8_t Memory::ioFetchLCDC()
 {

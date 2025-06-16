@@ -102,6 +102,8 @@ void SM83::debugRegs()
 	reg.PC = 0x0100; 
 }
 
+bool halted = false;
+
 SM83::SM83(Memory& memory) : memory(memory) {};
 
 inline void clearFlags() { //inline is replace the code directly during compile
@@ -352,7 +354,7 @@ void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result {Z1HC}
 void SM83::call(uint16_t jumpAddr)
 {
 	reg.SP -= 2;//minus two bytes for word
-	memory.writeWord(reg.SP, reg.PC); //T HIS MIGHT NEED TO BE PC
+	memory.writeWord(reg.SP, reg.PC); 
 	reg.PC = jumpAddr;
 }
 void SM83::push(uint16_t pushData)
@@ -1531,7 +1533,7 @@ void SM83::execute(uint8_t opcode)
 
 	case 0x20: { // JR NZ , e8
 		// jump to e8 if NotZ is met
-		int8_t offset = memory.read(reg.PC);  
+		int8_t offset = (int8_t)memory.read(reg.PC);
 		reg.PC++; // pc = 129
 		if (!isZeroFlag())
 		{
@@ -1885,30 +1887,19 @@ void SM83::execute(uint8_t opcode)
 	case 0x75: {
 		memory.write(reg.HL, reg.L);
 	} break;
-	case 0x76: {// HALT
-		//DO STUFF HERE (IME MODE)
-		if (IME)
-		{
-			// CPU enteters low poer mode until after an interupt is about to be serviced
-		}
-		else 
-		{
-			//check if there is an interrupt pending
+	case 0x76: { // TODO : THIS
+		if (IME) {
 
-			if (memory.ioFetchIF() == 0)
-			{
-				while (memory.ioFetchIF() == 0)
-				{
-					// if there is currently nothing pending, do nothing;
-				}
-			}
-			else
-			{
-				// pc is not incremented due to hardware bug ?
-				reg.PC--; // this feels very wrong, check this later
+			halted = true;
+		}
+		else {
+
+			uint8_t IF = memory.read(0xFF0F);
+			uint8_t IE = memory.read(0xFFFF);
+			if (!(IF & IE & 0x1F)) {
+				reg.PC--;
 			}
 		}
-
 	} break;
 	case 0x77: {
 		memory.write(reg.HL, reg.A);
@@ -2165,7 +2156,9 @@ void SM83::execute(uint8_t opcode)
 		}
 	} break;
 	case 0xC3: {
-		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
+		uint16_t addr = memory.readWord(reg.PC); 
+
+		reg.PC+=2;
 		reg.PC = addr;
 	} break;
 	case 0xC4: {//call nz a16
@@ -2183,6 +2176,7 @@ void SM83::execute(uint8_t opcode)
 		addByteReg(reg.A, memory.read(reg.PC));  reg.PC++;
 	} break;
 	case 0xC7: { //RST $00
+		std::cout<<"RESET CALLED	"<<std::endl;
 		call(0x00);
 	} break;
 	case 0xC8: { 
@@ -2219,7 +2213,7 @@ void SM83::execute(uint8_t opcode)
 			call(addr);
 		}
 	} break;
-	case 0xCD: { // call n16 THIS MIGHT BE BREAKING BOOT
+	case 0xCD: { 
 		uint16_t jumpAddr = memory.readWord(reg.PC); reg.PC+=2;
 		call(jumpAddr);
 	} break;
@@ -2280,8 +2274,7 @@ void SM83::execute(uint8_t opcode)
 	case 0xD9: {
 		//RETURN I  SUBROUTINE
 		reg.PC = popStack();
-		//IME_nextCycle = true; //<- TODO : this fees wrong, but check this later
-
+		IME = true;
 	} break;
 	case 0xDA: {
 		uint16_t addr = memory.readWord(reg.PC); reg.PC+=2;
@@ -2362,7 +2355,7 @@ void SM83::execute(uint8_t opcode)
 		call(0x28);
 	} break;
 
-			 //====0xF?===============================================================
+	//====0xF?===============================================================
 
 	case 0xF0: { // LDH  a [a8]
 		uint8_t offset = memory.read(reg.PC++);
@@ -2449,6 +2442,9 @@ uint8_t IE{};
 
 void SM83::handleInterrupts()
 {
+	uint8_t IF = memory.read(0xFF0F);
+	uint8_t IE = memory.ioFetchIE();
+
 	if (IF & 0b1 && IE & 0b1) //bit0 vBlank
 	{
 		//the corresponding IF bit and IME flag are reset
@@ -2473,7 +2469,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0050);
 		addCycle(5);
-		std::cout << "TIMER INTERRUPT" << std::endl;
+		//std::cout << "TIMER INTERRUPT" << std::endl;
 	}
 	if (IF & 0b1000 && IE & 0b1000) //bit3 Serial
 	{
@@ -2497,28 +2493,40 @@ void SM83::handleInterrupts()
 uint8_t SM83::executeInstruction()
 {
 
-	if (IME_nextCycle)
-	{
-		IME = true;
-		IME_nextCycle = false;
-	}
-
-
-
 	uint8_t opcode{};
 	uint8_t IF = memory.ioFetchIF();
-	uint8_t IE = memory.read(0xFFFF);
+	uint8_t IE = memory.ioFetchIE();
 
-	opcode = memory.read(reg.PC); //fetch
-	reg.PC++;
-	execute(opcode); // decode - execute
+	if (halted) {
+		std::cout << "HALTED" << std::endl;
+		cycles += 1;
+
+		if (IF & IE & 0x1F) {
+			halted = false;
+
+			if (!IME) {
+				reg.PC--;
+			}
+		}
+		return 1;
+	}
 
 	if (IME && ((IF & IE & 0x1F) != 0))
 	{
 		handleInterrupts();
 	}
 
+	if (IME_nextCycle)
+	{
+		IME = true;
+		IME_nextCycle = false;
+	}
 
+	opcode = memory.read(reg.PC); //fetch
+
+	//std::cout << " op: " << std::hex << (int)opcode << " PC :  " << (int)reg.PC << std::endl;
+	reg.PC++;
+	execute(opcode); // decode - execute
 
 	return opcodeCycles[opcode];
 }

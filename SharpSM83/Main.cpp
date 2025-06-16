@@ -352,10 +352,10 @@ int main()
     ppu.resetPPU();
     clock.resetClock();
    
-    //DEBUGS TO GET WORKING: -, 2, - , - , - , - , 7 , -, - , - , -
-    std::ifstream file("02.gb", std::ios::binary | std::ios::ate);
+    //DEBUGS TO GET WORKING: -, 2 , - , - , - , - , - , -, - , - , - , cpu_instrs
+    std::ifstream file("11-op.gb", std::ios::binary | std::ios::ate);
 
-    bool skipBootROM = false; 
+    bool skipBootROM = true; 
 
     if (file.is_open())
     {
@@ -375,14 +375,14 @@ int main()
         std::cout << "done loading memory" << std::endl;
     }
 
-    for (uint16_t i = 0; i < 256; i++) {
-        memory.write(i, bootROM[i]);
-    }
+    //for (uint16_t i = 0; i < 256; i++) {
+    //    memory.write(i, bootROM[i]);
+    //}
 
-    for (uint16_t i = 0x104; i < 0x133; i++)
-    {
-        memory.write(i, cartROM[i - 0x104]);
-    }
+    //for (uint16_t i = 0x104; i < 0x133; i++)
+    //{
+    //    memory.write(i, cartROM[i - 0x104]);
+    //}
 
     if (skipBootROM) {
 

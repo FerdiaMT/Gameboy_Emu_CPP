@@ -15,6 +15,7 @@ public:
 	uint8_t oam[0xA0]{};	// object attribute memory, for sprites
 	uint8_t io[0x80]{}; //<for cpu commands
 	uint8_t hram[0x7F]{}; //higher ram
+	uint8_t IE;
 
 	//should move these later but im gonna keep them here (cartidge file)
 
@@ -49,6 +50,7 @@ public:
 	uint8_t ioFetchTMA();
 	uint8_t ioFetchTAC();
 	uint8_t ioFetchIF();
+	uint8_t ioFetchIE();
 	uint8_t ioFetchLCDC();
 	uint8_t ioFetchSCY();
 	uint8_t ioFetchSCX();
