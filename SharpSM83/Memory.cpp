@@ -94,17 +94,23 @@ void Memory::initFastMap()
 
 uint8_t Memory::read(uint16_t address) // adress auto increment
 {
-	if (address == 0xFF44) {
-		return (uint8_t)0x90;
+	//if (address == 0xFF44) {return (uint8_t)0x90;}
+	if (vramLocked)
+	{
+		if (address > VRAM_LB && address < VRAM_UB)
+		{
+			return 0xFF;
+		}
 	}
+
 	return *fastMap[address];
 }
 
 uint8_t Memory::readPPU(uint16_t address) // adress auto increment
 {
-	if (address == 0xFF44) {
-		return (uint8_t)0x90;
-	}
+
+
+	//if (address == 0xFF44) {return (uint8_t)0x90;}
 	return *fastMap[address];
 }
 
@@ -141,11 +147,11 @@ void Memory::write(uint16_t address, uint8_t data)
 	}
 	else if (address <= VRAM_UB)
 	{
-		//if (vramLocked)
-		//{
-		//	
-		//	return;
-		//}
+		if (vramLocked)
+		{
+			
+			return;
+		}
 		
 		vram[address - VRAM_LB] = data;
 	}

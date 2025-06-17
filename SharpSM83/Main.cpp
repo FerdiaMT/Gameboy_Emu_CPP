@@ -352,10 +352,12 @@ int main()
     ppu.resetPPU();
     clock.resetClock();
    
-    //DEBUGS TO GET WORKING: -, 2 , - , - , - , - , - , -, - , - , - , cpu_instrs
-    std::ifstream file("07-jr.gb", std::ios::binary | std::ios::ate);
+    //CONFIRMED WORKING      : 1,(),3,4,5,6,7 ,8 ,9
+    // LONG / INCOMPLETE     : 11 (200MB+)  
+    // DEBUGS TO GET WORKING: cpu_instrs
+    std::ifstream file("01-special.gb", std::ios::binary | std::ios::ate);
 
-    bool skipBootROM = true; 
+    bool skipBootROM = false; 
 
     if (file.is_open())
     {
@@ -375,14 +377,14 @@ int main()
         std::cout << "done loading memory" << std::endl;
     }
 
-    //for (uint16_t i = 0; i < 256; i++) {
-    //    memory.write(i, bootROM[i]);
-    //}
+    for (uint16_t i = 0; i < 256; i++) {
+        memory.write(i, bootROM[i]);
+    }
 
-    //for (uint16_t i = 0x104; i < 0x133; i++)
-    //{
-    //    memory.write(i, cartROM[i - 0x104]);
-    //}
+    for (uint16_t i = 0x104; i < 0x133; i++)
+    {
+        memory.write(i, cartROM[i - 0x104]);
+    }
 
     if (skipBootROM) {
 
@@ -446,7 +448,7 @@ int main()
         auto currentTime = std::chrono::high_resolution_clock::now();
         //float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
         
-        if (allCycles >= 17573)//dt >= 16.73/*16.73*/) // once every 60 seconds (16.73 milliseconds)
+        if (allCycles >= 70292)//dt >= 16.73/*16.73*/) // once every 60 seconds (16.73 milliseconds)
         {
             //int waitCycle = allCycles - 17573;
             //if (waitCycle > 0)
@@ -477,12 +479,10 @@ int main()
         }
 
         allCycles++;
-
         cpu.executeCycle(allCycles);
-
-        clock.handleTimers(allCycles);
-
+        clock.handleTimers(allCycles); // check this to convert to dots
         ppu.executeTick();
+ 
 
         //while (SDL_PollEvent(&event))
         //{

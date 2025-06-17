@@ -205,7 +205,7 @@ uint8_t fetcherState{};
 
 void PPU::tileFetcher()
 {
-	if (fetcherX < 168) {
+	if (fetcherX < 160) {
 		if (fetcherX % 8 == 0)
 		{
 			fetchTileNo();
@@ -217,7 +217,8 @@ void PPU::tileFetcher()
 		fetcherX++;
 	}
 	else {
-		mode3Complete == true;
+		mode3Complete = true;
+		mode3Dots -= 1;
 	}
 
 
@@ -278,7 +279,8 @@ void resetVals()
 
 void PPU::executeTick() // measured in m cycles
 {
-	internalDot++;
+
+
 	currentLY = memory.ioFetchLY();
 
 	if (currentLY >= 144) // this is a demo
@@ -287,10 +289,11 @@ void PPU::executeTick() // measured in m cycles
 	}
 	else
 	{
-		if (internalDot <= 80)
+		if (internalDot < 80)
 		{
 			writeIntoSTAT(0b10);
 			mode2Tick();
+			memory.vramLocked = false;
 		}
 		else 
 		{
@@ -298,6 +301,9 @@ void PPU::executeTick() // measured in m cycles
 			//Mode 3 is 172 to 289 dots long
 			if (!mode3Complete)
 			{
+
+				memory.vramLocked = true;
+
 				mode3Tick();
 
 				writeIntoSTAT(0b11);
@@ -306,6 +312,8 @@ void PPU::executeTick() // measured in m cycles
 			}
 			else
 			{
+
+				memory.vramLocked = false;
 				//mode 0
 				writeIntoSTAT(0b0);
 			}
@@ -314,13 +322,15 @@ void PPU::executeTick() // measured in m cycles
 
 		if (internalDot >= 456) { // end of scanline
 			initFrame();
-			internalDot = 0;
+			internalDot = -1;
 			memory.ioIncrementLY();
 			//while (!backgroundFifo.empty()) backgroundFifo.pop();
 			fetcherX = 0;
 			internalX = 0;
 		}
 	}
+	//std::cout << "DOT :" << (int)internalDot << " MODE3 dot " << mode3Dots << "   vram:Lock " << (int)memory.vramLocked << "  " << (int)fetcherX << std::endl;
+	internalDot++;
 
 }
 
