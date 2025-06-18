@@ -16,6 +16,9 @@ public:
 	
 	void writeIntoSTAT(uint8_t x );
 
+	uint16_t getInternalDot();
+
+
 private:
 
 	Memory& memory;

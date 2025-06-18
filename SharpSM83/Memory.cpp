@@ -133,7 +133,7 @@ uint16_t Memory::viewWord(uint16_t address) // same ghere
 	return readWord(address);
 }
 
-
+bool badWrite = false;
 void Memory::write(uint16_t address, uint8_t data)
 {
 
@@ -149,7 +149,7 @@ void Memory::write(uint16_t address, uint8_t data)
 	{
 		if (vramLocked)
 		{
-			
+			badWrite = true;
 			return;
 		}
 		

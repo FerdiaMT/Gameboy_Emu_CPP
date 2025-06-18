@@ -446,18 +446,8 @@ int main()
     {
 
         auto currentTime = std::chrono::high_resolution_clock::now();
-        //float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
-        
         if (allCycles >= 70292)//dt >= 16.73/*16.73*/) // once every 60 seconds (16.73 milliseconds)
         {
-            //int waitCycle = allCycles - 17573;
-            //if (waitCycle > 0)
-            //{
-
-            //}
-
-
-
             ppu.updateScreenBuffer(pixelState);
             drawAllPixels(memory);
 
@@ -483,6 +473,11 @@ int main()
         clock.handleTimers(allCycles); // check this to convert to dots
         ppu.executeTick();
  
+        if (memory.badWrite)
+        {
+            std::cout << "bad write at LY:" << (int)memory.ioFetchLY() <<"  PC :" << (int)cpu.getPC() << "  PPU CYCLE: " << (int)ppu.getInternalDot() << std::endl;
+            memory.badWrite = false;
+        }
 
         //while (SDL_PollEvent(&event))
         //{

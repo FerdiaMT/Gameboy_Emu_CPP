@@ -82,6 +82,8 @@ public:
 
 	bool dmaPending = false;
 
+	bool badWrite = false;
+
 private:
 
 

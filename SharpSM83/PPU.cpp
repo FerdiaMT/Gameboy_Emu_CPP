@@ -364,3 +364,8 @@ void PPU::updateScreenBuffer(uint8_t(&mainScreen)[160][144])
 {
 	std::memcpy(mainScreen, screen, sizeof(screen));
 }
+
+uint16_t PPU::getInternalDot()
+{
+	return internalDot;
+}
