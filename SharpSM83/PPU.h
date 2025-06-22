@@ -31,6 +31,11 @@ private:
 	void fetchTileNo();
 	void fetchTileL();
 	void fetchTileH();
+
+	void fetchWindowTileNo();
+	void fetchWindowTileL();
+	void fetchWindowTileH();
+
 	void fifoPush();
 	void shiftPixel();
 	uint8_t mergeWithSprite(uint8_t bgPixel, int pixelsX);

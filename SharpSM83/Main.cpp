@@ -114,57 +114,8 @@ void setupSDL3()
     }
 }
 
-
-void setPixelState(Memory& memory) //do this later
-{
-
-}
-
-
-uint8_t pixeldemo[0x9000]{};
-
-void loadTestPalette()
-{
-
-    uint8_t tester[16] = { 0x3C, 0x7E,
-        0x42, 0x42,
-        0x42, 0x42,
-        0x42, 0x42,
-        0x7E, 0x5E,
-        0x7E, 0x0A,
-        0x7C, 0x56,
-        0x38, 0x7C };
-
-    for (int i = 0x8000; i < 0x9FFF; i+=16) {
-        uint8_t counter{};
-        while (counter < 16) {
-            pixeldemo[counter + i] = tester[counter];
-            counter++;
-        }
-    }
-    pixeldemo[0x8010] = 0xFF;
-    pixeldemo[0x8011] = 0xFF;
-
-    pixeldemo[0x8080] = 0xFF;
-    pixeldemo[0x8081] = 0xFF;
-
-    pixeldemo[0x8100] = 0xFF;
-    pixeldemo[0x8101] = 0xFF;
-
-
-}
-
 void drawTextureWindow(Memory& memory) // going to use this to draw out the textures
 {
-
-    //each tile takes up 16 bytes.
-    //each byte is a line , overlay 2 to get proper image
-
-    //00 ~ white
-    //01 ~ weak
-    //10 ~ medium
-    //11 ~ black
-
 
     uint8_t c = 0;
     int level = 0x8000;
@@ -178,8 +129,6 @@ void drawTextureWindow(Memory& memory) // going to use this to draw out the text
                 uint8_t row2 = memory.readPPU(level + (y * 2) + 1 + (tw * 16) + (th * 16 * 8*2));
 
                 for (int x = 0; x < 8; x++) {
-
-                    // if 0 = 255
 
                     uint8_t mainBit = (row2 >> (7 - x) & 0b1) << 1 | (row1 >> (7 - x) & 0b1);
                     if (mainBit == 0b11)
@@ -199,8 +148,6 @@ void drawTextureWindow(Memory& memory) // going to use this to draw out the text
     }
 
     SDL_RenderPresent(renderer2);
-
-    
 }
 
 static SDL_Texture* pixelTexture = nullptr;
@@ -261,6 +208,7 @@ static void drawMapA(Memory& memory)
 {
     uint8_t c = 0;
     uint16_t memAdress = 0x9800; // this can also be 9c00 // goes up to 9bFF // 9800
+
     uint16_t memAdress2 = 0x8000;
     for (int ty = 0; ty < 32; ty++) {
         for (int tx = 0; tx < 32; tx++) {
@@ -268,7 +216,7 @@ static void drawMapA(Memory& memory)
             for (int y = 0; y < 8; y++) {
 
                 uint8_t row1 = memory.readPPU(memAdress2 + tileNumber + (y * 2));
-                uint8_t row2 = memory.readPPU(memAdress2 + tileNumber + (y * 2));
+                uint8_t row2 = memory.readPPU(memAdress2 + tileNumber + (y * 2)+1);
 
                 for (int x = 0; x < 8; x++) {
 
@@ -294,6 +242,48 @@ static void drawMapA(Memory& memory)
     }
     SDL_RenderPresent(renderer3);
 }
+
+static void drawMapB(Memory& memory)
+{
+    uint8_t c = 0;
+    uint16_t mapAddr = 0x9800;
+    uint16_t tileDataBase = 0x9000; 
+
+    for (int ty = 0; ty < 32; ty++) {
+        for (int tx = 0; tx < 32; tx++) {
+
+            int8_t tileNumber = (int8_t)memory.readPPU(mapAddr + tx + (ty * 32));
+
+            uint16_t tileAddr = tileDataBase + ( (int16_t)tileNumber * 16);
+
+            for (int y = 0; y < 8; y++) {
+
+                uint8_t row1 = memory.readPPU(tileAddr + (y * 2));
+                uint8_t row2 = memory.readPPU(tileAddr + (y * 2) + 1);
+
+                for (int x = 0; x < 8; x++) {
+                    uint8_t mainBit = ((row2 >> (7 - x)) & 0b1) << 1 | ((row1 >> (7 - x)) & 0b1);
+
+                    if (mainBit == 0b11)
+                    {
+                        c = 0;
+                    }
+                    else
+                    {
+                        c = 255 - (mainBit * 100);
+                    }
+
+                    SDL_SetRenderDrawColor(renderer3, c, c, c, 255);
+                    SDL_FRect pixel2 = { (SCALE * tx * 8) + (x * SCALE),  (SCALE * ty * 8) + (y * SCALE), SCALE, SCALE };
+                    SDL_RenderFillRect(renderer3, &pixel2);
+                }
+            }
+        }
+    }
+
+    SDL_RenderPresent(renderer3);
+}
+
 
 
 uint8_t bootROM[256] = {
@@ -321,33 +311,16 @@ uint8_t cartROM[0x30] = {
     0xBB, 0xBB, 0x67 ,0x63, 0x6E, 0x0E ,0xEC ,0xCC ,0xDD ,0xDC, 0x99 ,0x9F, 0xBB, 0xB9, 0x33, 0x3E
 };
 
-
 double cyclesPerFrame = 70224;
 double cpuCyclesPerFrame = 4194304.0 / 59.7;
 
 
-/*
-*
-* Things to make :
-*
-* Cartridge
-* PPU
-* timer
-* screen mabye ?
-* input
-* interrupts as seperate class, mabye
-*/
-
 int main()
 {
 	Memory memory;
-
 	SM83 cpu(memory);
-
     PPU ppu(memory);
-
     Clock clock(memory);
-
 	cpu.reset();
     memory.reset();
     ppu.resetPPU();
@@ -356,24 +329,19 @@ int main()
     //CONFIRMED WORKING      : 1,(),3,4,5,6,7 ,8 ,9
     // LONG / INCOMPLETE     : 11 (200MB+)  
     // DEBUGS TO GET WORKING: cpu_instrs
-    std::ifstream file("02.gb", std::ios::binary | std::ios::ate);
+    std::ifstream file("tetris.gb", std::ios::binary | std::ios::ate);
 
     bool skipBootROM = true; 
 
     if (file.is_open())
     {
-
         std::streampos size = file.tellg();
         char* buffer = new char[size];
-
         file.seekg(0, std::ios::beg);
         file.read(buffer, size);
         file.close();
 
-        for (int i = 0; i < size; ++i)
-        {
-           memory.write(i, buffer[i]);
-        }
+        for (int i = 0; i < size; ++i){ memory.write(i, buffer[i]);}
         delete[] buffer;
         std::cout << "done loading memory" << std::endl;
     }
@@ -420,27 +388,21 @@ int main()
         for (uint16_t i = 0; i < 256; i++) {
             memory.write(i, bootROM[i]);
         }
-
         for (uint16_t i = 0x104; i < 0x133; i++)
         {
             memory.write(i, cartROM[i - 0x104]);
         }
     }
 
+    int allCycles{};
+    auto lastCycleTime = std::chrono::high_resolution_clock::now();
+    bool renderFrame = false;
+    uint16_t cpuDotsFromExec{};
+
     setupSDL();
-    //setupSDL2(); //<- textureviewer
+    setupSDL2(); //<- textureviewer
     //setupSDL3(); // <- map viewer
     SDL_Event event;
-
-    //going to do this without the whole clock class for now
-
-    int allCycles{};
-
-    auto lastCycleTime = std::chrono::high_resolution_clock::now();
-
-    bool renderFrame = false;
-
-    uint16_t cpuDotsFromExec{};
 
     if (!initPixelRenderer(renderer)) {
         // Handle error - maybe exit the program
@@ -469,39 +431,41 @@ int main()
             cpu.cycles = 0;
             clock.resetClockCycle();
 
-            //drawTextureWindow(memory);
+            drawTextureWindow(memory);
             //drawMapA(memory);
         }
 
-        
         cpuDotsFromExec = cpu.executeInstruction();
-        
 
         //std::cout << "last cycle was " << std::dec << (int)cpuDotsFromExec << " with OP:  " << std::hex << (int)cpu.getLastOP();if (memory.badWrite){std::cout << "   bad write at LY:" <<std::dec<< (int)memory.ioFetchLY() << "  PC :" << (int)cpu.getPC() << "  PPU CYCLE: " << (int)ppu.getInternalDot();memory.badWrite = false;}std::cout<< std::endl;
 
         uint16_t c{};
-       
 
-
-        if ((memory.ioFetchLCDC() & 0x80) != 0)
+        if ((memory.ioFetchLCDC() & 0x80) != 0) // check lcdc bit 7
         {
             for (int i = 0; i < cpuDotsFromExec; i++)
             {
                 ppu.executeTick();
             }
         }
-        clock.handleTimers(allCycles);
+        else {
+            memory.ioWriteLY(0);
+        }
+
+        for (int i = 0; i < cpuDotsFromExec; i++)
+        {
+            clock.executeTick();
+        }
+
         allCycles += cpuDotsFromExec / 4;
 
         //while (SDL_PollEvent(&event))
         //{
         //    memset(keyboardState, 0, sizeof(keyboardState));
-
         //    if (event.type == SDL_EVENT_QUIT) {
         //        running = false;
         //    }
-        //    if (event.type == SDL_EVENT_KEY_DOWN) {
-        //        
+        //    if (event.type == SDL_EVENT_KEY_DOWN) {  
         //    }
         //}
 

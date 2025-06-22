@@ -4,6 +4,7 @@
 #include <iostream>
 #include <queue>
 #include <cstring>
+#include <bitset>
 
 uint16_t internalDot{};
 uint16_t mode3Dots{};
@@ -115,7 +116,6 @@ void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE
 }
 
 uint8_t fetcherX{}; 
-uint8_t windowLineCounter{};
 
 uint8_t screenX{};
 uint8_t screenY{};
@@ -126,11 +126,17 @@ uint16_t tileNumber{};
 uint8_t bgx{};
 uint8_t bgy{};
 
+uint16_t mode3Penalty = 12;
+
+
+bool renderingWindow = false;
+uint16_t windowY{};
+uint16_t windowLineCounter = 0;
+bool windowTriggered = false;
 
 
 void PPU::fetchTileNo()
 {
-	//these 2 give us the coordinates of the visible portion of the map
 	if ((memory.ioFetchLCDC() & 0b1000))
 	{
 		memAddr = 0x9C00;
@@ -143,7 +149,7 @@ void PPU::fetchTileNo()
 	bgx = (memory.ioFetchSCX() + fetcherX) % 256;
 	bgy = (memory.ioFetchSCY() + currentLY) % 256;
 	 
-	tileNumber = (memory.readPPU(memAddr + (bgx / 8) + ((bgy / 8) *32) ));
+	tileNumber = (memory.readPPU(memAddr + (bgx / 8) + (bgy / 8) *32));
 }
 
 uint8_t tileDataA{};
@@ -155,7 +161,7 @@ void PPU:: fetchTileL()
 	uint8_t fineY = (bgy) % 8;
 
 
-	if (memory.ioFetchLCDC() & 0b10000)
+	if ((memory.ioFetchLCDC() & 0x10))
 	{
 		memAddr = 0x8000;
 		tileDataA = memory.readPPU( memAddr + (tileNumber * 0x10) + (fineY *2) );
@@ -163,7 +169,7 @@ void PPU:: fetchTileL()
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataA = memory.readPPU(memAddr + ((int8_t)tileNumber*16) + currentLY * 2);
+		tileDataA = memory.readPPU(memAddr + ((int8_t)tileNumber*16) + fineY * 2);
 
 	}
 }
@@ -173,17 +179,84 @@ void PPU::fetchTileH()
 
 	uint8_t fineY = (bgy) % 8;
 
-	if (memory.ioFetchLCDC() & 0b10000)
+	if ((memory.ioFetchLCDC() & 0x10))
 	{
 		memAddr = 0x8000;
-		tileDataB = memory.readPPU(1+memAddr + (tileNumber * 0x10) + (fineY * 2));
+		tileDataB = memory.readPPU(1+(memAddr + (tileNumber * 0x10) + (fineY * 2)));
+
+
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataB = memory.readPPU(1+memAddr + ((int8_t)tileNumber * 16) + currentLY * 2);
+		tileDataB = memory.readPPU(1+ (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
 	}
 }
+
+
+
+
+void PPU::fetchWindowTileNo()
+{
+	if ((memory.ioFetchLCDC() & 0b01000000))
+	{
+		if ((memory.ioFetchLCDC() & 0b1000))
+		{
+			memAddr = 0x9C00;
+		}
+		else
+		{
+			memAddr = 0x9800;
+		}
+
+		uint8_t winx = memory.ioFetchWX() - 7;
+		uint8_t winy = memory.ioFetchWY();
+
+		if (currentLY >= winy)
+		{
+			windowY = currentLY - winy;
+			tileNumber = (memory.readPPU(memAddr + ((fetcherX - (winx)) / 8) + (windowY / 8) * 32));
+			renderingWindow = true;
+		}
+	}
+}
+
+void PPU::fetchWindowTileL()
+{
+	if (!renderingWindow) return;
+
+	uint8_t fineY = windowY % 8;
+
+	if (memory.ioFetchLCDC() & 0x10)
+	{
+		memAddr = 0x8000;
+		tileDataA = memory.readPPU(memAddr + (tileNumber * 0x10) + (fineY * 2));
+	}
+	else
+	{ //8800 mode
+		memAddr = 0x9000;
+		tileDataA = memory.readPPU(memAddr + ((int8_t)tileNumber * 16) + fineY * 2);
+	}
+}
+
+void PPU::fetchWindowTileH()
+{
+	if (!renderingWindow) return;
+
+	uint8_t fineY = windowY % 8;
+
+	if (memory.ioFetchLCDC() & 0x10)
+	{
+		memAddr = 0x8000;
+		tileDataB = memory.readPPU(1 + (memAddr + (tileNumber * 0x10) + (fineY * 2)));
+	}
+	else
+	{ //8800 mode
+		memAddr = 0x9000;
+		tileDataB = memory.readPPU(1 + (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
+	}
+}
+
 
 bool fifoCanPush = false;
 
@@ -203,14 +276,36 @@ uint8_t twelveDot{};
 uint8_t fetcherState{};
 
 
+
 void PPU::tileFetcher()
 {
 	if (fetcherX < 160) {
+		uint8_t winx = memory.ioFetchWX() - 7;
+		bool windowActive = (memory.ioFetchLCDC() & 0b01000000) &&(memory.ioFetchWY() <= currentLY) &&(fetcherX >= winx) && (winx <= 166); 
+
+		if (windowActive && !windowTriggered)
+		{
+			windowTriggered = true;
+			windowLineCounter++;
+			fetcherX = 0; 
+		}
+
 		if (fetcherX % 8 == 0)
 		{
-			fetchTileNo();
-			fetchTileL();
-			fetchTileH();
+			if (windowTriggered)
+			{
+				fetchWindowTileNo();
+				fetchWindowTileL();
+				fetchWindowTileH();
+			}
+			else
+			{
+				//std::cout << std::bitset<8>(memory.ioFetchLCDC() ) << std::endl;
+
+				fetchTileNo();
+				fetchTileL();
+				fetchTileH();
+			}
 			fifoPush();
 			fifoCanPush = true;
 		}
@@ -218,18 +313,19 @@ void PPU::tileFetcher()
 	}
 	else {
 		mode3Complete = true;
+		fifoCanPush = false;
 		mode3Dots -= 1;
 	}
-
-
 }
+
+
 
 uint8_t internalX{};
 
 void PPU::drawPixel()
 {
 
-	if (internalX < 160 )  // Only draw visible pixels
+	if (internalX < 160 )  
 	{
 		screen[internalX][currentLY] = backgroundFifo.front();
 	}
@@ -246,34 +342,13 @@ void PPU::mode3Tick()
 	{
 		drawPixel();
 	}
-	//if (!tileFetcherFinished)
-	//{
-	//	tileFetcher();
-	//}
-	//else
-	//{
-	//	pixelOutputMode = true;
-	//	tileFetcherFinished = false;
-	//}
-
-	//if (pixelOutputMode)
-	//{
-	//	if (!backgroundFifo.empty())
-	//	{
-	//		drawPixel();
-
-	//	}
-	//	else {
-	//		pixelOutputMode = false;
-	//	}
 }
 
 
 void resetVals()
 {
-	
 	twelveDot = 0;
-
+	mode3Penalty = 12;
 }
 
 
@@ -313,9 +388,21 @@ void PPU::executeTick() // measured in m cycles
 			else
 			{
 
-				memory.vramLocked = false;
-				//mode 0
-				writeIntoSTAT(0b0);
+				//this area compensates for both mode 3 and mode 0
+
+				if (mode3Penalty > 0) 
+				{
+					mode3Penalty--;
+				}
+				else  //mode 0
+				{
+					memory.vramLocked = false;
+					
+					writeIntoSTAT(0b0);
+				}
+
+
+
 			}
 
 		}

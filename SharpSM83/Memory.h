@@ -54,6 +54,8 @@ public:
 	uint8_t ioFetchLCDC();
 	uint8_t ioFetchSCY();
 	uint8_t ioFetchSCX();
+	uint8_t ioFetchWX();
+	uint8_t ioFetchWY();
 
 	uint8_t ioFetchLY();
 

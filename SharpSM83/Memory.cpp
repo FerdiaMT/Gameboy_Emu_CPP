@@ -94,11 +94,11 @@ void Memory::initFastMap()
 
 uint8_t Memory::read(uint16_t address) // adress auto increment
 {
-	//if (address == 0xFF44) {return (uint8_t)0x90;}
-	if (vramLocked)
+	if (vramLocked && ((ioFetchLCDC() & 0x80) == 0))
 	{
 		if (address > VRAM_LB && address < VRAM_UB)
 		{
+			std::cout << "Bad read" << std::endl;
 			return 0xFF;
 		}
 	}
@@ -109,8 +109,6 @@ uint8_t Memory::read(uint16_t address) // adress auto increment
 uint8_t Memory::readPPU(uint16_t address) // adress auto increment
 {
 
-
-	//if (address == 0xFF44) {return (uint8_t)0x90;}
 	return *fastMap[address];
 }
 
@@ -122,18 +120,6 @@ uint16_t Memory::readWord(uint16_t address)
 	return (high << 8) | low;
 }
 
-
-uint8_t Memory::view(uint16_t address) // remove this later
-{
-	return read(address);
-}
-
-uint16_t Memory::viewWord(uint16_t address) // same ghere
-{
-	return readWord(address);
-}
-
-bool badWrite = false;
 void Memory::write(uint16_t address, uint8_t data)
 {
 
@@ -149,7 +135,7 @@ void Memory::write(uint16_t address, uint8_t data)
 	{
 		if (vramLocked)
 		{
-			badWrite = true;
+			std::cout << "badWrite" << std::endl;
 			return;
 		}
 		
@@ -241,7 +227,7 @@ void Memory::writePPU(uint16_t address, uint8_t data)
 	}
 	else if (address <= OAM_UB)
 	{
-		if (vramLocked) return;
+		//if (vramLocked) return;
 
 		oam[address - OAM_LB] = data;
 
@@ -358,6 +344,17 @@ uint8_t Memory::ioFetchSCX()
 {
 	return io[0x43];
 }
+
+uint8_t Memory::ioFetchWY()
+{
+	return io[0x4A];
+}
+
+uint8_t Memory::ioFetchWX()
+{
+	return io[0x4B];
+}
+
 
 
 uint8_t Memory::ioFetchLY()

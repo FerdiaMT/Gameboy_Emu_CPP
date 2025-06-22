@@ -77,60 +77,68 @@ int tacModulo()
     return 64;
 }
 
-void Clock::handleTimers(int allCycles)
-{
-    if ((allCycles % 64) == 0) // this is the DIV timer
-    {
-        memory.ioIncrementDIV();
-    }
-
-    fetchTac();
-
-    if (Tac & 0b100) // if TAC enabled
-    {
-        if ((allCycles % tacModulo()) == 0) // modulo depends on ff06
-        {
-            memory.ioIncrementTIMA();
-
-            if (memory.ioFetchTIMA() == 0x00) // if overflowed
-            {
-                memory.ioWriteTIMA(memory.ioFetchTMA());
-                memory.setInterruptTimer();
-            }
-        }
-    }
-}
-
 int clockCycle{};
 
-void Clock::executeTick()
-{
-    clockCycle++;
 
-    if ((clockCycle % 64) == 0) // this is the DIV timer
-    {
-        memory.ioIncrementDIV();
-    }
-
-    fetchTac();
-
-    if (Tac & 0b100) // if TAC enabled
-    {
-        if ((clockCycle % tacModulo()) == 0) // modulo depends on ff06
-        {
-            memory.ioIncrementTIMA();
-
-            if (memory.ioFetchTIMA() == 0x00) // if overflowed
-            {
-                memory.ioWriteTIMA(memory.ioFetchTMA());
-                memory.setInterruptTimer();
-            }
-        }
-    }
-}
 
 void Clock::resetClockCycle()
 {
     clockCycle = 0;
 }
 
+uint16_t divCounter = 0;  
+int timaReloadDelay = -1;   
+bool timaWillReload = false; 
+
+
+void Clock::executeTick() 
+{
+    uint16_t prevDivCounter = divCounter;
+    divCounter++;
+    memory.ioWriteDIV(divCounter >> 8);
+
+    fetchTac();
+
+    if (Tac & 0b100) 
+    {
+        int bit = 0;
+        switch (Tac & 0b11) 
+        {
+        case 0: bit = 9; break; 
+        case 1: bit = 3; break;  
+        case 2: bit = 5; break;  
+        case 3: bit = 7; break; 
+        }
+
+        bool prevBit = (prevDivCounter >> bit) & 1;
+        bool currBit = (divCounter >> bit) & 1;
+
+        if (prevBit == 1 && currBit == 0) 
+        { 
+            if (!timaWillReload) 
+            {
+                if (memory.ioFetchTIMA() == 0xFF) 
+                {
+                    timaReloadDelay = 4;    
+                    timaWillReload = true; 
+                }
+                else 
+                {
+                    memory.ioIncrementTIMA();
+                }
+            }
+        }
+    }
+
+
+    if (timaReloadDelay >= 0) 
+    {
+        timaReloadDelay--;
+        if (timaReloadDelay == 0) 
+        {
+            memory.ioWriteTIMA(memory.ioFetchTMA());
+            memory.setInterruptTimer();   
+            timaWillReload = false;          
+        }
+    }
+}

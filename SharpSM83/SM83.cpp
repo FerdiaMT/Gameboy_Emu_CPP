@@ -2511,6 +2511,8 @@ void SM83::handleInterrupts()
 	uint8_t IF = memory.read(0xFF0F);
 	uint8_t IE = memory.ioFetchIE();
 
+	if (!IME) return;
+
 	if (IF & 0b1 && IE & 0b1) //bit0 vBlank
 	{
 		//the corresponding IF bit and IME flag are reset
@@ -2519,7 +2521,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0040);
 		addCycle(5);
-		//std::cout << "VBLANK INTERRUPT" << std::endl;
+		std::cout << "VBLANK INTERRUPT" << std::endl;
 	}
 	if (IF & 0b10 && IE & 0b10) //bit1 LCDstat
 	{
@@ -2535,7 +2537,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0050);
 		addCycle(5);
-		//std::cout << "TIMER INTERRUPT" << std::endl;
+		std::cout << "TIMER INTERRUPT" << std::endl;
 	}
 	if (IF & 0b1000 && IE & 0b1000) //bit3 Serial
 	{
@@ -2552,7 +2554,6 @@ void SM83::handleInterrupts()
 		addCycle(5);
 	}
 
-	// mabye do this : addCycle(5);
 }
 
 uint16_t previousOP{};
@@ -2605,8 +2606,8 @@ uint8_t SM83::executeInstruction()
 		IME = true;
 		IME_nextCycle = false;
 	}
-	previousOP = reg.PC;
-	//logCPUState();
+	//previousOP = reg.PC;
+	////logCPUState();
 	opcode = memory.read(reg.PC); //fetch
 
 	reg.PC++;
