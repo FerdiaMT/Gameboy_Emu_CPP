@@ -452,20 +452,15 @@ int main()
             drawAllPixels(memory);
 
             float dt = std::chrono::duration<float, std::chrono::milliseconds::period>(currentTime - lastCycleTime).count();
-
-            //std::cout << 1000 / (dt) << std::endl;
             if (dt < 16.73)
             {
                 using namespace std::chrono_literals;
                 auto wait = (16.73-dt) * 1ms;
                 std::this_thread::sleep_for(wait);
             }
-
             lastCycleTime = currentTime;
             allCycles = 0;
-            cpu.cycles = 0; //<- need to do this properly
-
-            //drawMapA(memory);
+            cpu.cycles = 0;
         }
 
         allCycles++;
