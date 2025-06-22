@@ -2572,12 +2572,12 @@ void SM83::logCPUState() {
 		file << oss.str() << '\n';
 	}
 }
-
+uint8_t opcode{};
 
 uint8_t SM83::executeInstruction()
 {
+	cycles = 0;
 
-	uint8_t opcode{};
 	uint8_t IF = memory.ioFetchIF();
 	uint8_t IE = memory.ioFetchIE();
 
@@ -2612,9 +2612,9 @@ uint8_t SM83::executeInstruction()
 	reg.PC++;
 	execute(opcode); // decode - execute
 
-	
+	cycles += opcodeCycles[opcode];
 
-	return opcodeCycles[opcode];
+	return cycles;
 }
 
 void SM83::executeCycle(double cyclesAvailable)
@@ -2636,4 +2636,9 @@ void SM83::executeCycle(double cyclesAvailable)
 uint16_t SM83::getPC()
 {
 	return reg.PC;
+}
+
+uint8_t SM83::getLastOP()
+{
+	return opcode;
 }

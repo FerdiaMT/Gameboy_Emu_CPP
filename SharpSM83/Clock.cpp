@@ -101,3 +101,36 @@ void Clock::handleTimers(int allCycles)
     }
 }
 
+int clockCycle{};
+
+void Clock::executeTick()
+{
+    clockCycle++;
+
+    if ((clockCycle % 64) == 0) // this is the DIV timer
+    {
+        memory.ioIncrementDIV();
+    }
+
+    fetchTac();
+
+    if (Tac & 0b100) // if TAC enabled
+    {
+        if ((clockCycle % tacModulo()) == 0) // modulo depends on ff06
+        {
+            memory.ioIncrementTIMA();
+
+            if (memory.ioFetchTIMA() == 0x00) // if overflowed
+            {
+                memory.ioWriteTIMA(memory.ioFetchTMA());
+                memory.setInterruptTimer();
+            }
+        }
+    }
+}
+
+void Clock::resetClockCycle()
+{
+    clockCycle = 0;
+}
+

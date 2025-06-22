@@ -165,6 +165,7 @@ void drawTextureWindow(Memory& memory) // going to use this to draw out the text
     //10 ~ medium
     //11 ~ black
 
+
     uint8_t c = 0;
     int level = 0x8000;
 
@@ -355,9 +356,9 @@ int main()
     //CONFIRMED WORKING      : 1,(),3,4,5,6,7 ,8 ,9
     // LONG / INCOMPLETE     : 11 (200MB+)  
     // DEBUGS TO GET WORKING: cpu_instrs
-    std::ifstream file("01-special.gb", std::ios::binary | std::ios::ate);
+    std::ifstream file("02.gb", std::ios::binary | std::ios::ate);
 
-    bool skipBootROM = false; 
+    bool skipBootROM = true; 
 
     if (file.is_open())
     {
@@ -377,14 +378,7 @@ int main()
         std::cout << "done loading memory" << std::endl;
     }
 
-    for (uint16_t i = 0; i < 256; i++) {
-        memory.write(i, bootROM[i]);
-    }
-
-    for (uint16_t i = 0x104; i < 0x133; i++)
-    {
-        memory.write(i, cartROM[i - 0x104]);
-    }
+    
 
     if (skipBootROM) {
 
@@ -422,6 +416,16 @@ int main()
         memory.write(0xFF4B, 0x00); 
         memory.write(0xFF50, 0x01); 
     }
+    else {
+        for (uint16_t i = 0; i < 256; i++) {
+            memory.write(i, bootROM[i]);
+        }
+
+        for (uint16_t i = 0x104; i < 0x133; i++)
+        {
+            memory.write(i, cartROM[i - 0x104]);
+        }
+    }
 
     setupSDL();
     //setupSDL2(); //<- textureviewer
@@ -436,6 +440,8 @@ int main()
 
     bool renderFrame = false;
 
+    uint16_t cpuDotsFromExec{};
+
     if (!initPixelRenderer(renderer)) {
         // Handle error - maybe exit the program
         printf("Failed to initialize pixel renderer!\n");
@@ -446,7 +452,7 @@ int main()
     {
 
         auto currentTime = std::chrono::high_resolution_clock::now();
-        if (allCycles >= 70292)//dt >= 16.73/*16.73*/) // once every 60 seconds (16.73 milliseconds)
+        if (allCycles >= 17573)//dt >= 16.73/*16.73*/) // once every 60 seconds (16.73 milliseconds)
         {
             ppu.updateScreenBuffer(pixelState);
             drawAllPixels(memory);
@@ -461,18 +467,31 @@ int main()
             lastCycleTime = currentTime;
             allCycles = 0;
             cpu.cycles = 0;
+            clock.resetClockCycle();
+
+            //drawTextureWindow(memory);
+            //drawMapA(memory);
         }
 
-        allCycles++;
-        cpu.executeCycle(allCycles);
-        clock.handleTimers(allCycles); // check this to convert to dots
-        ppu.executeTick();
- 
-        if (memory.badWrite)
+        
+        cpuDotsFromExec = cpu.executeInstruction();
+        
+
+        //std::cout << "last cycle was " << std::dec << (int)cpuDotsFromExec << " with OP:  " << std::hex << (int)cpu.getLastOP();if (memory.badWrite){std::cout << "   bad write at LY:" <<std::dec<< (int)memory.ioFetchLY() << "  PC :" << (int)cpu.getPC() << "  PPU CYCLE: " << (int)ppu.getInternalDot();memory.badWrite = false;}std::cout<< std::endl;
+
+        uint16_t c{};
+       
+
+
+        if ((memory.ioFetchLCDC() & 0x80) != 0)
         {
-            std::cout << "bad write at LY:" << (int)memory.ioFetchLY() <<"  PC :" << (int)cpu.getPC() << "  PPU CYCLE: " << (int)ppu.getInternalDot() << std::endl;
-            memory.badWrite = false;
+            for (int i = 0; i < cpuDotsFromExec; i++)
+            {
+                ppu.executeTick();
+            }
         }
+        clock.handleTimers(allCycles);
+        allCycles += cpuDotsFromExec / 4;
 
         //while (SDL_PollEvent(&event))
         //{

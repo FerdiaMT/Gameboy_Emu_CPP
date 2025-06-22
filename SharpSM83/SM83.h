@@ -75,6 +75,8 @@ public:
 	void checkInterruptFlags();
 
 	uint16_t getPC();
+	uint8_t getLastOP();
+
 private:
 
 	Memory& memory;
