@@ -126,6 +126,12 @@ uint8_t Memory::read(uint16_t address)
 	//	return 0x90;
 	//}
 
+
+	if (address == 0xFF00) // joypad stub 
+	{
+		return 0xFF;
+	}
+
 	return *fastMap[address];
 }
 
