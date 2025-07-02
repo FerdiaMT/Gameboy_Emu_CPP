@@ -45,4 +45,7 @@
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\..\..\Downloads\Super Mario Land (World)\Super Mario Land (World).gb" />
+  </ItemGroup>
 </Project>

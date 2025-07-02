@@ -680,7 +680,7 @@ void SM83::executePrefix(uint8_t opcode)
 	case 0x25: {
 		sla(reg.L);
 	} break;
-	case 0x26: {// whatever hl is pointing to
+	case 0x26: {// whatever hl is pointing to 
 		addCycle(2);
 		uint8_t a8 = memory.read(reg.HL);
 		sla(a8);
@@ -1620,11 +1620,11 @@ void SM83::execute(uint8_t opcode)
 	case 0x25: {
 		decByte(reg.H);
 	}break;
-	case 0x26: {
+	case 0x26: { //THIS ONE IS APPARENTLY BREAKING THE SYSTEM ACCORDING TO GAMEBOYDOCTOR
 		reg.H = memory.read(reg.PC); 
 		reg.PC++;
 	}break;
-	case 0x27: { // potentially fixed ? unsure
+	case 0x27: { 
 		uint8_t a = reg.A;
 		bool c = isCarryFlag();
 		bool h = isHalfFlag();
@@ -2423,7 +2423,7 @@ void SM83::execute(uint8_t opcode)
 
 	//====0xF?===============================================================
 
-	case 0xF0: { // LDH  a [a8]
+	case 0xF0: { // LDH  a [a8] 
 		uint8_t offset = memory.read(reg.PC++);
 		uint16_t io_addr = 0xFF00 + offset;
 		reg.A = memory.read(io_addr);
@@ -2506,7 +2506,7 @@ void SM83::reset()
 uint8_t IF{};
 uint8_t IE{};
 
-void SM83::handleInterrupts()
+void SM83::handleInterrupts() // ive got IF set to 2 when it should be 0 somehow
 {
 	uint8_t IF = memory.read(0xFF0F);
 	uint8_t IE = memory.ioFetchIE();
@@ -2521,7 +2521,7 @@ void SM83::handleInterrupts()
 		IME = false;
 		call(0x0040);
 		addCycle(5);
-		std::cout << "VBLANK INTERRUPT" << std::endl;
+		//std::cout << "VBLANK INTERRUPT" << std::endl;
 	}
 	if (IF & 0b10 && IE & 0b10) //bit1 LCDstat
 	{
@@ -2568,7 +2568,7 @@ void SM83::logCPUState() {
 	oss << "SP:" << std::setw(4) << reg.SP << " " << "PC:" << std::setw(4) << static_cast<int>(previousOP) << " ";
 	oss << "PCMEM:" << std::setw(2) << static_cast<int>(memory.readPPU(previousOP)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+1)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+2)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+3));
 
-	std::ofstream file("log.txt", std::ios::app);
+	std::ofstream file("02B.txt", std::ios::app);
 	if (file.is_open()) {
 		file << oss.str() << '\n';
 	}
@@ -2578,6 +2578,11 @@ uint8_t opcode{};
 uint8_t SM83::executeInstruction()
 {
 	cycles = 0;
+	previousOP = reg.PC;
+	//if (!halted)
+	//{
+	//logCPUState();
+	//}
 
 	uint8_t IF = memory.ioFetchIF();
 	uint8_t IE = memory.ioFetchIE();
@@ -2606,8 +2611,10 @@ uint8_t SM83::executeInstruction()
 		IME = true;
 		IME_nextCycle = false;
 	}
-	//previousOP = reg.PC;
-	////logCPUState();
+	
+
+
+
 	opcode = memory.read(reg.PC); //fetch
 
 	reg.PC++;
