@@ -32,6 +32,7 @@
 #define HR_LB   0xFF80
 #define HR_UB   0xFFFE
 
+uint8_t joypad_select = 0xFF;
 
 /*
 MAINTENANCE REQUIRED : REMOVE THE VIEW AND VIEWWORD FUNCTIONS
@@ -39,7 +40,15 @@ MAINTENANCE REQUIRED : REMOVE THE VIEW AND VIEWWORD FUNCTIONS
 */
 
 
+bool buttons[6] // false means on, true means off (weird but get used to this)
+{
+	true,true,true,true,true,true // start , select
+};
 
+void Memory::insertKeyboard(bool input[])
+{
+	std::memcpy(buttons, input, 6);
+}
 
 
 
@@ -127,9 +136,27 @@ uint8_t Memory::read(uint16_t address)
 	//}
 
 
-	if (address == 0xFF00) // joypad stub 
-	{
-		return 0xFF;
+	if (address == 0xFF00) {
+
+		//std::cout << (int)buttons[0] << " " << (int)buttons[1] << " " << (int)buttons[2] << " " << (int)buttons[3] << " " << (int)buttons[4] << " " << (int)buttons[5] << std::endl;
+
+		uint8_t result = joypad_select |0xCF ;
+
+		if (!(joypad_select & 0x10)) 
+		{
+			if (buttons[0]) result &= ~0x04; 
+			if (buttons[1]) result &= ~0x08; 
+			if (buttons[2]) result &= ~0x02; 
+			if (buttons[3]) result &= ~0x01; 
+		}
+
+		if (!(joypad_select & 0x20)) 
+		{
+			if (buttons[4]) result &= ~0x08; 
+			if (buttons[5]) result &= ~0x04;
+		}
+
+		return result;
 	}
 
 	return *fastMap[address];
@@ -211,6 +238,12 @@ void Memory::write(uint16_t address, uint8_t data)
 
 			
 		}
+
+		if (address == 0xFF00) {
+			joypad_select = data & 0x30; //this is a bit messy, make clean later
+			return;
+		}
+
 
 		io[address - IO_LB] = data;
 
@@ -476,6 +509,8 @@ void Memory::setInterruptJoypad()
 {
 	io[0x0F] |= 0b10000;
 }
+
+
 
 
 

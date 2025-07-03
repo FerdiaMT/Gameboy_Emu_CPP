@@ -32,7 +32,7 @@ const int SCALE = 5;
 
 
 uint8_t pixelState[160][144]{}; // for now this can be 0,1,2,3,4
-bool keyboardState[16]{};
+bool keyboardState[6]{true,true,true,true,true,true};
 
 /*
 Todo:
@@ -435,15 +435,39 @@ int main()
 
         allCycles += cpuDotsFromExec / 4;
 
-        //while (SDL_PollEvent(&event))
-        //{
-        //    memset(keyboardState, 0, sizeof(keyboardState));
-        //    if (event.type == SDL_EVENT_QUIT) {
-        //        running = false;
-        //    }
-        //    if (event.type == SDL_EVENT_KEY_DOWN) {  
-        //    }
-        //}
+
+        
+        while (SDL_PollEvent(&event))
+        {
+            
+            if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) {
+                bool isPressed = (event.type == SDL_EVENT_KEY_DOWN) ? false : true;
+
+                switch (event.key.key) {
+
+                case SDLK_UP:
+                    keyboardState[0] = isPressed;
+                    break;
+                case SDLK_DOWN:
+                    keyboardState[1] = isPressed;
+                    break;
+                case SDLK_LEFT:
+                    keyboardState[2] = isPressed;
+                    break;
+                case SDLK_RIGHT:
+                    keyboardState[3] = isPressed;
+                    break;
+                case SDLK_Z: // start
+                    keyboardState[4] = isPressed;
+                    break;
+                case SDLK_X: // select
+                    keyboardState[5] = isPressed;
+                    break;
+                }
+            }
+        }
+
+        memory.insertKeyboard(keyboardState);
 
     }
     SDL_DestroyRenderer(renderer);

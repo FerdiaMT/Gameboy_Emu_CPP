@@ -86,6 +86,8 @@ public:
 
 	bool badWrite = false;
 
+	void insertKeyboard(bool input[]);
+
 private:
 
 
