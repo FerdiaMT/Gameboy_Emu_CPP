@@ -428,6 +428,10 @@ int main()
             memory.ioWriteLY(0);
         }
 
+        if (memory.writeToDiv() == true) 
+        {
+            clock.divCounter = 0;
+        }
         for (int i = 0; i < cpuDotsFromExec; i++)
         {
             clock.executeTick();

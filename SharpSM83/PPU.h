@@ -4,6 +4,15 @@
 #include <cstdint>
 #include "Memory.h"
 #include "SM83.h"
+
+struct Sprite {
+	uint8_t x;
+	uint8_t y;
+	uint8_t ti;    
+	uint8_t attr;  
+};
+
+
 class PPU
 {
 public:
@@ -17,6 +26,9 @@ public:
 	void writeIntoSTAT(uint8_t x );
 
 	uint16_t getInternalDot();
+
+	void updateSTAT();
+	void checkSTATInterrupts();
 
 
 private:
@@ -44,6 +56,8 @@ private:
 	void drawPixel();
 
 	void tileFetcher();
+
+	void fetchSpriteTile(const Sprite& sprite);
 
 };
 #endif

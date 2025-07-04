@@ -80,13 +80,12 @@ int tacModulo()
 int clockCycle{};
 
 
-
 void Clock::resetClockCycle()
 {
     clockCycle = 0;
 }
 
-uint16_t divCounter = 0;  
+
 int timaReloadDelay = -1;   
 bool timaWillReload = false; 
 

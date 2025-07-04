@@ -13,6 +13,7 @@ public:
 	void executeTick();
 	void resetClockCycle();
 
+	uint16_t divCounter{};
 private:
 	Memory& memory;
 

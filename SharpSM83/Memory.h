@@ -56,8 +56,10 @@ public:
 	uint8_t ioFetchSCX();
 	uint8_t ioFetchWX();
 	uint8_t ioFetchWY();
+	uint8_t ioFetchSTAT();
 
 	uint8_t ioFetchLY();
+	uint8_t ioFetchLYC();
 
 	void ioWriteJOYP(uint8_t data);
 	void ioWriteSB(uint8_t data);
@@ -68,6 +70,7 @@ public:
 	void ioWriteTAC(uint8_t data);
 	void ioWriteIF(uint8_t data);
 	void ioWriteLY(uint8_t data);
+	void ioWriteStat(uint8_t data);
 
 	void ioIncrementDIV();
 	void ioIncrementTIMA();
@@ -87,6 +90,9 @@ public:
 	bool badWrite = false;
 
 	void insertKeyboard(bool input[]);
+
+	bool writeToDiv();
+	bool writeToLYC();
 
 private:
 

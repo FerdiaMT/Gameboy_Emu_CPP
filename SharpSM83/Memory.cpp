@@ -50,6 +50,31 @@ void Memory::insertKeyboard(bool input[])
 	std::memcpy(buttons, input, 6);
 }
 
+bool divWrite = false;
+
+
+
+bool Memory::writeToDiv()
+{
+	if (divWrite) 
+	{
+		divWrite = false;
+		return true;
+	}
+	return false;
+}
+
+bool LYCWrite = false;
+
+bool Memory::writeToLYC()
+{
+	if (LYCWrite)
+	{
+		LYCWrite = false;
+		return true;
+	}
+	return false;
+}
 
 
 Memory::Memory() 
@@ -129,13 +154,6 @@ uint8_t Memory::read(uint16_t address)
 			return 0xFF;
 		}
 	}
-
-	//if (address == 0xFF44)
-	//{
-	//	return 0x90;
-	//}
-
-
 	if (address == 0xFF00) {
 
 		//std::cout << (int)buttons[0] << " " << (int)buttons[1] << " " << (int)buttons[2] << " " << (int)buttons[3] << " " << (int)buttons[4] << " " << (int)buttons[5] << std::endl;
@@ -221,19 +239,30 @@ void Memory::write(uint16_t address, uint8_t data)
 			std::cout << c; 
 		}
 
+
+		if (address == 0xFF04)
+		{
+			divWrite = true;
+		}
+
+		if (address == 0xFF45)
+		{
+			LYCWrite = true;
+		}
+
+
 		if (address == 0xFF46) //OAM DMA START
 		{
-			//writing here starts transfer of rom to oam
-			//supposed to take 160 machine cycles ? how do i do this
+			//std::cout << "OAM started" <<(int)address <<std::endl;
 			dmaPending = true;
 
 			//Source:      $XX00 - $XX9F;XX = $00 to $DF
 			//Destination : $FE00 - $FE9F
+			uint16_t sourceAddr = data << 8;
 			uint16_t endAddr = 0xFE00;
-			for (uint16_t i = (data << 2); i <= ((data << 2) | 0x9F); i++) // from source start to source end
+			for (uint16_t i = 0; i < 0xA0; ++i)   // 160 bytes
 			{
-				write(endAddr, read(i));
-				endAddr++;
+				write(endAddr + i, read(sourceAddr + i));
 			}
 
 			
@@ -296,6 +325,12 @@ void Memory::writePPU(uint16_t address, uint8_t data)
 	}
 	else if (address <= IO_UB) // i should have no return
 	{
+
+		if (address == 0xFF04)
+		{
+			divWrite = true;
+		}
+
 		if (address == 0xFF46) //OAM DMA START
 		{
 			//writing here starts transfer of rom to oam
@@ -424,6 +459,18 @@ uint8_t Memory::ioFetchLY()
 	return io[0x44];
 }
 
+uint8_t Memory::ioFetchLYC()
+{
+	return io[0x45];
+}
+
+uint8_t Memory::ioFetchSTAT()
+{
+	return io[0x41];
+}
+
+
+
 void Memory::ioIncrementLY()
 {
 	io[0x44]++;
@@ -446,6 +493,7 @@ void Memory::ioWriteSC(uint8_t data)
 
 void Memory::ioWriteDIV(uint8_t data)
 {
+	divWrite = true;
 	io[0x4] = data;
 }
 
@@ -473,6 +521,12 @@ void Memory::ioWriteLY(uint8_t data)
 {
 	io[0x44] = data;
 }
+
+void Memory::ioWriteStat(uint8_t data)
+{
+	io[0x41] = data;
+}
+
 
 void Memory::ioIncrementDIV()
 {

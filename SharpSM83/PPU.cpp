@@ -9,10 +9,17 @@
 uint16_t internalDot{};
 uint16_t mode3Dots{};
 
-bool mode3Complete = false;
 
+struct SpritePixel {
+	uint8_t color;
+	bool bgPriority;
+	bool transparent;
+};
+
+bool mode3Complete = false;
+bool spritesSorted = false;
 std::queue<uint8_t> backgroundFifo{};
-std::queue<uint8_t>  spriteFifo{};
+std::queue<SpritePixel> spriteFifo{};
 uint8_t screen[160][144];
 
 uint8_t currentLY{};
@@ -29,6 +36,42 @@ void PPU::resetPPU()
 {
 
 }
+
+uint8_t currentMode{};
+
+void PPU::updateSTAT() {
+	uint8_t STAT = memory.readPPU(0xFF41);
+	uint8_t LY = memory.readPPU(0xFF44);
+	uint8_t LYC = memory.readPPU(0xFF45);
+
+	if (LY == LYC) {
+
+		STAT |= 0x04; 
+	}
+	else {
+		STAT &= ~0x04;
+	}
+
+	STAT = (STAT & 0xF8) | currentMode;
+
+	memory.writePPU(0xFF41, STAT);
+}
+
+void PPU::checkSTATInterrupts() {
+	uint8_t STAT = memory.readPPU(0xFF41);
+	bool trigger = false;
+
+	if ((currentMode == 0) && (STAT & 0x08)) trigger = true; // HBlank
+	if ((currentMode == 1) && (STAT & 0x10)) trigger = true; // VBlank
+	if ((currentMode == 2) && (STAT & 0x20)) trigger = true; // OAM
+	if ((STAT & 0x04) && (STAT & 0x40)) trigger = true;      // LYC
+
+	if (trigger) {
+		uint8_t IF = memory.ioFetchIF();
+		memory.ioWriteIF(IF | 0x02); // STAT interrupt
+	}
+}
+
 
 void PPU::writeIntoSTAT(uint8_t mode)
 {
@@ -80,29 +123,39 @@ uint16_t searchAddr = 0xFE00;
 
 uint8_t curItemsOnScanline = 0;
 
-uint8_t oamBuffer[40]{};
+//struct Sprite {
+//	uint8_t x;
+//	uint8_t y;
+//	uint8_t ti;
+//	uint8_t attr;
+//};
 
+std::vector<Sprite> scanlineQueue{};
 
 void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE 
 {
 	if (!mode2Half)
 	{
 
-		searchAddr = 0xFE00; // for the oam
+		// for the oam
 	}
 	else
 	{
 		uint8_t oamY = memory.readPPU(searchAddr);
 
-		if (currentLY == oamY && curItemsOnScanline <=10)
+		if (currentLY >= oamY-16  && currentLY < oamY-16+8 && curItemsOnScanline <=10)
 		{
-			curItemsOnScanline++;
-
-			oamBuffer[(curItemsOnScanline * 4) - 4] = oamY; // this should be fine,   // y
-			oamBuffer[(curItemsOnScanline * 4) -3 ] = memory.readPPU(searchAddr + 1); // x 
-			oamBuffer[(curItemsOnScanline * 4) -2 ] = memory.readPPU(searchAddr + 2); // tile index
-			oamBuffer[(curItemsOnScanline * 4) -1 ] = memory.readPPU(searchAddr + 3); // attributes
 			
+			curItemsOnScanline++;
+			Sprite sprite;
+			sprite.y = oamY; // this should be fine,   // y
+			sprite.x = memory.readPPU(searchAddr + 1); // x 
+			sprite.ti = memory.readPPU(searchAddr + 2); // tile index
+			sprite.attr = memory.readPPU(searchAddr + 3); // attributes
+
+			//std::cout << "added at ti: x " <<(int)sprite.x << " y : " << (int) sprite.y << " "<< (int)sprite.ti << std::endl;
+			scanlineQueue.push_back(sprite);
+
 			//4 bytes  , BYTE  = 8 bit
 		}
 		
@@ -110,8 +163,6 @@ void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE
 		searchAddr += 0x04; 
 	}
 	mode2Half = !mode2Half;
-
-	
 
 }
 
@@ -264,9 +315,47 @@ bool tileFetcherFinished = false;
 bool pixelOutputMode = false;
 
 
+void PPU::fetchSpriteTile(const Sprite& sprite)
+{
+	uint8_t spriteHeight = (memory.ioFetchLCDC() & 0x04) ? 16 : 8;
+
+	int16_t spriteY = currentLY - (sprite.y - 16);
+	if (spriteY < 0 || spriteY >= spriteHeight) return;
+
+	uint16_t tileIndex = sprite.ti;
+	if (spriteHeight == 16) 
+	{
+		tileIndex &= 0xFE; 
+	}
+
+	if (sprite.attr & 0x40) 
+	{
+		spriteY = spriteHeight - 1 - spriteY;
+	}
+
+	uint16_t addr = 0x8000 + (tileIndex * 16) + spriteY * 2;
+	uint8_t dataLo = memory.readPPU(addr);
+	uint8_t dataHi = memory.readPPU(addr + 1);
+
+	for (int i = 7; i >= 0; i--)
+	{
+		int pixelBit = (sprite.attr & 0x20) ? 7 - i : i;
+		uint8_t color = ((dataHi >> pixelBit) & 1) << 1 | ((dataLo >> pixelBit) & 1);
+
+		SpritePixel spx;
+		spx.color = color;
+		spx.bgPriority = sprite.attr & 0x80;
+		spx.transparent = (color == 0);
+
+		spriteFifo.push(spx);
+	}
+}
+
+
 void PPU::fifoPush() {
 
-	for (int x = 7; x >= 0; x--) {
+	for (int x = 7; x >= 0; x--) 
+	{
 		backgroundFifo.push(((tileDataB >> x) & 0b1) << 1 | ((tileDataA >> x) & 0b1));
 	}
 	tileFetcherFinished = true;
@@ -279,7 +368,8 @@ uint8_t fetcherState{};
 
 void PPU::tileFetcher()
 {
-	if (fetcherX < 160) {
+	if (fetcherX < 160) 
+	{
 		uint8_t winx = memory.ioFetchWX() - 7;
 		bool windowActive = (memory.ioFetchLCDC() & 0b01000000) &&(memory.ioFetchWY() <= currentLY) &&(fetcherX >= winx) && (winx <= 166); 
 
@@ -300,18 +390,31 @@ void PPU::tileFetcher()
 			}
 			else
 			{
-				//std::cout << std::bitset<8>(memory.ioFetchLCDC() ) << std::endl;
-
 				fetchTileNo();
 				fetchTileL();
 				fetchTileH();
 			}
 			fifoPush();
+
+
 			fifoCanPush = true;
 		}
+
+
+		for (const auto& sprite : scanlineQueue)
+		{
+			//std::cout << "sprite checked"<<std::endl;
+			if (sprite.x - 8 == fetcherX)
+
+			{
+				fetchSpriteTile(sprite);
+			}
+		}
+
 		fetcherX++;
 	}
-	else {
+	else 
+	{
 		mode3Complete = true;
 		fifoCanPush = false;
 		mode3Dots -= 1;
@@ -324,20 +427,40 @@ uint8_t internalX{};
 
 void PPU::drawPixel()
 {
+	if (backgroundFifo.empty())
+		return;
 
-	if (internalX < 160 )  
-	{
-		screen[internalX][currentLY] = backgroundFifo.front();
+	uint8_t bgColor = backgroundFifo.front();
+	uint8_t finalColor = bgColor;
+
+	if (!spriteFifo.empty()) {
+		SpritePixel spx = spriteFifo.front();
+		finalColor = spx.color;
+		spriteFifo.pop();
 	}
-	backgroundFifo.pop();
 
+	backgroundFifo.pop();
+	screen[internalX][currentLY] = finalColor;
 	internalX++;
 }
 
 
+
 void PPU::mode3Tick() 
 {
+
+	if (!spritesSorted)
+	{
+		std::sort(scanlineQueue.begin(), scanlineQueue.end(), [](const Sprite& a, const Sprite& b) 
+		{
+			return a.x < b.x;
+		});
+
+		spritesSorted = true;
+	}
+
 	tileFetcher();
+	//spriteFetcher();
 	if (!backgroundFifo.empty())
 	{
 		drawPixel();
@@ -358,7 +481,17 @@ void PPU::executeTick() // measured in m cycles
 
 	currentLY = memory.ioFetchLY();
 
-	if (currentLY >= 144) // this is a demo
+	if (memory.writeToLYC() )
+	{
+		updateSTAT();
+
+		if (memory.ioFetchLY() == memory.ioFetchLYC())
+		{
+			memory.ioWriteStat(memory.ioFetchSTAT() | 0x04);
+		}
+	}
+
+	if (currentLY >= 144) 
 	{
 		mode1Tick();
 	}
@@ -366,9 +499,10 @@ void PPU::executeTick() // measured in m cycles
 	{
 		if (internalDot < 80)
 		{
-			writeIntoSTAT(0b10);
 			mode2Tick();
 			memory.vramLocked = false;
+			currentMode = 0b10;
+			updateSTAT();
 		}
 		else 
 		{
@@ -381,7 +515,8 @@ void PPU::executeTick() // measured in m cycles
 
 				mode3Tick();
 
-				writeIntoSTAT(0b11);
+				currentMode = 0b11;
+				updateSTAT();
 
 				mode3Dots++;
 			}
@@ -398,7 +533,8 @@ void PPU::executeTick() // measured in m cycles
 				{
 					memory.vramLocked = false;
 					
-					writeIntoSTAT(0b0);
+					currentMode = 0b0;
+					updateSTAT();
 				}
 
 
@@ -408,12 +544,39 @@ void PPU::executeTick() // measured in m cycles
 		}
 
 		if (internalDot >= 456) { // end of scanline
+
+			//this section is when the ly changes and everything increments
+
+
+			searchAddr = 0xFE00;
+			scanlineQueue.clear();
+			curItemsOnScanline = 0;
+			spritesSorted = false;
 			initFrame();
 			internalDot = -1;
-			memory.ioIncrementLY();
-			//while (!backgroundFifo.empty()) backgroundFifo.pop();
+			
 			fetcherX = 0;
 			internalX = 0;
+			//check if ly == lyc
+			if (memory.ioFetchLY() == memory.ioFetchLYC())
+			{
+				memory.ioWriteStat(memory.ioFetchSTAT() | 0x04);
+			}
+			else
+			{
+				memory.ioWriteStat(memory.ioFetchSTAT() | ~0x04);
+			}
+
+
+			memory.ioIncrementLY();
+
+			updateSTAT();
+
+			if (memory.ioFetchLY() == memory.ioFetchLYC())
+			{
+				memory.ioWriteStat(memory.ioFetchSTAT() | 0x04);
+			}
+
 		}
 	}
 	//std::cout << "DOT :" << (int)internalDot << " MODE3 dot " << mode3Dots << "   vram:Lock " << (int)memory.vramLocked << "  " << (int)fetcherX << std::endl;
@@ -425,7 +588,8 @@ void PPU::executeTick() // measured in m cycles
 
 void PPU::mode1Tick() // 10 scanlines of 456 dots
 {
-	writeIntoSTAT(0b1);
+	currentMode = 0b1;
+	updateSTAT();
 	uint8_t temp = memory.ioFetchIF();
 	memory.ioWriteIF(temp |= 0b1);
 
@@ -439,6 +603,7 @@ void PPU::mode1Tick() // 10 scanlines of 456 dots
 		if (currentLY == 153)
 		{
 			memory.ioWriteLY(0);
+			
 		}
 		else
 		{

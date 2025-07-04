@@ -2584,6 +2584,13 @@ uint8_t SM83::executeInstruction()
 	//logCPUState();
 	//}
 
+	if (memory.dmaPending) {
+		/*cycles += 160;*/
+		memory.dmaPending = false;
+		//std::cout << "DMA";
+		return 160*4; // TODO: double heck this number
+	}
+
 	uint8_t IF = memory.ioFetchIF();
 	uint8_t IE = memory.ioFetchIE();
 
@@ -2627,18 +2634,7 @@ uint8_t SM83::executeInstruction()
 
 void SM83::executeCycle(double cyclesAvailable)
 {
-	while (cycles < cyclesAvailable)
-	{
-		if (memory.dmaPending) {
-			cycles += 160;
-			memory.dmaPending = false;
-			std::cout << "DMA";
-		}
-		else
-		{
-			cycles += executeInstruction();
-		}	
-	}
+	
 }
 
 uint16_t SM83::getPC()
