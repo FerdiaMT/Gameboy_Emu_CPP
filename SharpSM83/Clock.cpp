@@ -112,16 +112,21 @@ void Clock::executeTick()
         bool prevBit = (prevDivCounter >> bit) & 1;
         bool currBit = (divCounter >> bit) & 1;
 
-        if (prevBit == 1 && currBit == 0) 
-        { 
-            if (!timaWillReload) 
+        if (prevBit == 1 && currBit == 0)
+        {
+            if (!timaWillReload)
             {
-                if (memory.ioFetchTIMA() == 0xFF) 
+                if (memory.ioFetchTIMA() == 0xFF)
                 {
-                    timaReloadDelay = 4;    
-                    timaWillReload = true; 
+                    memory.ioWriteTIMA(0x00);
+
+
+                    memory.requestInterrupt(0x04);
+
+                    timaReloadDelay = 4;
+                    timaWillReload = true;
                 }
-                else 
+                else
                 {
                     memory.ioIncrementTIMA();
                 }
@@ -130,14 +135,16 @@ void Clock::executeTick()
     }
 
 
-    if (timaReloadDelay >= 0) 
+    if (timaReloadDelay >= 0)
     {
         timaReloadDelay--;
-        if (timaReloadDelay == 0) 
+        if (timaReloadDelay == 0)
         {
+
             memory.ioWriteTIMA(memory.ioFetchTMA());
-            memory.setInterruptTimer();   
-            timaWillReload = false;          
+            timaWillReload = false;
+            timaReloadDelay = -1;
         }
     }
+
 }

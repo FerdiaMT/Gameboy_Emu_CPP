@@ -94,6 +94,10 @@ public:
 	bool writeToDiv();
 	bool writeToLYC();
 
+	void requestInterrupt(uint8_t mask);
+	void clearInterrupt(uint8_t mask);
+
+
 private:
 
 

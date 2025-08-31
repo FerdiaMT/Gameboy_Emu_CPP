@@ -474,6 +474,7 @@ void resetVals()
 	mode3Penalty = 12;
 }
 
+bool enteredModeOne = true;
 
 void PPU::executeTick() // measured in m cycles
 {
@@ -554,6 +555,7 @@ void PPU::executeTick() // measured in m cycles
 			spritesSorted = false;
 			initFrame();
 			internalDot = -1;
+			enteredModeOne = true;
 			
 			fetcherX = 0;
 			internalX = 0;
@@ -564,7 +566,7 @@ void PPU::executeTick() // measured in m cycles
 			}
 			else
 			{
-				memory.ioWriteStat(memory.ioFetchSTAT() | ~0x04);
+				memory.ioWriteStat(memory.ioFetchSTAT() & ~0x04);
 			}
 
 
@@ -586,27 +588,27 @@ void PPU::executeTick() // measured in m cycles
 
 
 
-void PPU::mode1Tick() // 10 scanlines of 456 dots
+void PPU::mode1Tick()
 {
-	currentMode = 0b1;
-	updateSTAT();
-	uint8_t temp = memory.ioFetchIF();
-	memory.ioWriteIF(temp |= 0b1);
+	if (enteredModeOne) {
+		currentMode = 0b1;
+		updateSTAT();
 
-	if (internalDot >= 456) 
-	{ 
+		// request VBlank IF
+		memory.ioWriteIF(memory.ioFetchIF() | 0x01);
 
+		enteredModeOne = false;
+	}
+
+	if (internalDot >= 456)
+	{
 		resetVals();
-
 		internalDot = 0;
 
-		if (currentLY == 153)
-		{
+		if (currentLY == 153) {
 			memory.ioWriteLY(0);
-			
 		}
-		else
-		{
+		else {
 			memory.ioIncrementLY();
 		}
 	}

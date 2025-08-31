@@ -512,9 +512,9 @@ void Memory::ioWriteTAC(uint8_t data)
 	io[0x7] = data;
 }
 
-void Memory::ioWriteIF(uint8_t data)
-{
-	io[0xF] = data;
+
+void Memory::ioWriteIF(uint8_t val) { // this is currently resevred to JUST t he ppu, not the cpu
+    io[0x0F] |= val;
 }
 
 void Memory::ioWriteLY(uint8_t data)
@@ -522,10 +522,16 @@ void Memory::ioWriteLY(uint8_t data)
 	io[0x44] = data;
 }
 
-void Memory::ioWriteStat(uint8_t data)
-{
-	io[0x41] = data;
+//void Memory::ioWriteStat(uint8_t data)
+//{
+//	io[0x41] = data;
+//}
+
+void Memory::ioWriteStat(uint8_t val) {
+	uint8_t cur = io[0x41];
+	io[0x41] = (cur & 0x07) | (val & 0xF8);
 }
+
 
 
 void Memory::ioIncrementDIV()
@@ -565,6 +571,10 @@ void Memory::setInterruptJoypad()
 }
 
 
+void Memory::requestInterrupt(uint8_t mask) {
+	io[0x0F] = io[0x0F] | (mask & 0x1F); 
+}
 
-
-
+void Memory::clearInterrupt(uint8_t mask) {
+	io[0x0F] = io[0x0F] & ~(mask & 0x1F);
+}

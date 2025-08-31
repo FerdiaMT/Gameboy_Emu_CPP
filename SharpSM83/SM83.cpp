@@ -2558,21 +2558,7 @@ void SM83::handleInterrupts() // ive got IF set to 2 when it should be 0 somehow
 
 uint16_t previousOP{};
 
-void SM83::logCPUState() {
-	std::ostringstream oss;
-	oss << std::hex << std::uppercase << std::setfill('0');
-	oss << "A:" << std::setw(2) << static_cast<int>(reg.A) << " " << "F:" << std::setw(2) << static_cast<int>(reg.F) << " ";
-	oss << "B:" << std::setw(2) << static_cast<int>(reg.B) << " " << "C:" << std::setw(2) << static_cast<int>(reg.C) << " ";
-	oss << "D:" << std::setw(2) << static_cast<int>(reg.D) << " " << "E:" << std::setw(2) << static_cast<int>(reg.E) << " ";
-	oss << "H:" << std::setw(2) << static_cast<int>(reg.H) << " " << "L:" << std::setw(2) << static_cast<int>(reg.L) << " ";
-	oss << "SP:" << std::setw(4) << reg.SP << " " << "PC:" << std::setw(4) << static_cast<int>(previousOP) << " ";
-	oss << "PCMEM:" << std::setw(2) << static_cast<int>(memory.readPPU(previousOP)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+1)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+2)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP+3));
 
-	std::ofstream file("02B.txt", std::ios::app);
-	if (file.is_open()) {
-		file << oss.str() << '\n';
-	}
-}
 uint8_t opcode{};
 
 uint8_t SM83::executeInstruction()
@@ -2618,10 +2604,6 @@ uint8_t SM83::executeInstruction()
 		IME = true;
 		IME_nextCycle = false;
 	}
-	
-
-
-
 	opcode = memory.read(reg.PC); //fetch
 
 	reg.PC++;
@@ -2645,4 +2627,20 @@ uint16_t SM83::getPC()
 uint8_t SM83::getLastOP()
 {
 	return opcode;
+}
+
+void SM83::logCPUState() {
+	std::ostringstream oss;
+	oss << std::hex << std::uppercase << std::setfill('0');
+	oss << "A:" << std::setw(2) << static_cast<int>(reg.A) << " " << "F:" << std::setw(2) << static_cast<int>(reg.F) << " ";
+	oss << "B:" << std::setw(2) << static_cast<int>(reg.B) << " " << "C:" << std::setw(2) << static_cast<int>(reg.C) << " ";
+	oss << "D:" << std::setw(2) << static_cast<int>(reg.D) << " " << "E:" << std::setw(2) << static_cast<int>(reg.E) << " ";
+	oss << "H:" << std::setw(2) << static_cast<int>(reg.H) << " " << "L:" << std::setw(2) << static_cast<int>(reg.L) << " ";
+	oss << "SP:" << std::setw(4) << reg.SP << " " << "PC:" << std::setw(4) << static_cast<int>(previousOP) << " ";
+	oss << "PCMEM:" << std::setw(2) << static_cast<int>(memory.readPPU(previousOP)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP + 1)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP + 2)) << "," << std::setw(2) << static_cast<int>(memory.readPPU(previousOP + 3));
+
+	std::ofstream file("02B.txt", std::ios::app);
+	if (file.is_open()) {
+		file << oss.str() << '\n';
+	}
 }
