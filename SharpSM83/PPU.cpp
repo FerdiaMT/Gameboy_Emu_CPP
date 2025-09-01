@@ -39,75 +39,45 @@ void PPU::resetPPU()
 
 uint8_t currentMode{};
 
-void PPU::updateSTAT() {
-	uint8_t STAT = memory.readPPU(0xFF41);
-	uint8_t LY = memory.readPPU(0xFF44);
-	uint8_t LYC = memory.readPPU(0xFF45);
 
-	if (LY == LYC) {
+void PPU::updateLYC() {
+	uint8_t stat = memory.readPPU(0xFF41);
+	uint8_t ly = memory.readPPU(0xFF44);
+	uint8_t lyc = memory.readPPU(0xFF45);
 
-		STAT |= 0x04; 
-	}
-	else {
-		STAT &= ~0x04;
-	}
+	bool coincBefore = (stat & 0x04) != 0;
+	bool coincNow = (ly == lyc);
 
-	STAT = (STAT & 0xF8) | currentMode;
+	// write coincidence flag
+	stat = coincNow ? (stat | 0x04) : (stat & ~0x04);
+	memory.writePPU(0xFF41, stat);
 
-	memory.writePPU(0xFF41, STAT);
-}
-
-void PPU::checkSTATInterrupts() {
-	uint8_t STAT = memory.readPPU(0xFF41);
-	bool trigger = false;
-
-	if ((currentMode == 0) && (STAT & 0x08)) trigger = true; // HBlank
-	if ((currentMode == 1) && (STAT & 0x10)) trigger = true; // VBlank
-	if ((currentMode == 2) && (STAT & 0x20)) trigger = true; // OAM
-	if ((STAT & 0x04) && (STAT & 0x40)) trigger = true;      // LYC
-
-	if (trigger) {
-		uint8_t IF = memory.ioFetchIF();
-		memory.ioWriteIF(IF | 0x02); // STAT interrupt
+	// edge-trigger STAT IF if enabled
+	if (!coincBefore && coincNow && (stat & 0x40)) {
+		memory.requestInterrupt(0x02);
 	}
 }
 
+void PPU::updateMode(uint8_t newMode) {
+	static uint8_t prevMode = 0xFF;
+	uint8_t stat = memory.readPPU(0xFF41);
 
-void PPU::writeIntoSTAT(uint8_t mode)
-{
-	uint8_t val = memory.readPPU(0xFF41);
-	val = (val & 0b11111100) | mode;
-	memory.writePPU(0xFF41, val);
+	if (newMode != prevMode) {
+		// set mode bits
+		stat = (stat & ~0x03) | newMode;
+		memory.writePPU(0xFF41, stat);
 
-	if (mode == 0b00 && ((val & 0b1000) >> 3 == 1)) //mode 0 trigger
-	{
-		uint8_t temp = memory.ioFetchIF();
-		memory.ioWriteIF(temp |= 0b10);
-	}
-	else if (mode == 0b01 && ((val & 0b10000) >> 4 == 1)) //mode 1 trigger
-	{
-		uint8_t temp = memory.ioFetchIF();
-		memory.ioWriteIF(temp |= 0b10);
-	}
-	else if (mode == 0b10 && ((val & 0b100000) >> 5 == 1)) //mode 2 trigger
-	{
-		uint8_t temp = memory.ioFetchIF();
-		memory.ioWriteIF(temp |= 0b10);
-	}
-	else if (mode == 0b11 && ((val & 0b1000000) >> 6 == 1)) //mode 3 trigger
-	{
-		uint8_t temp = memory.ioFetchIF();
-		memory.ioWriteIF(temp |= 0b10);
-	}
+		bool req = false;
+		if (newMode == 0 && (stat & 0x08)) req = true; // HBlank
+		if (newMode == 1 && (stat & 0x10)) req = true; // VBlank
+		if (newMode == 2 && (stat & 0x20)) req = true; // OAM
 
-	if ((val & 0b100) >> 2 == (val & 0b1000000) >> 6) // LY = LYC
-	{
-		uint8_t temp = memory.ioFetchIF();
-		memory.ioWriteIF(temp |= 0b10);
+		if (req) {
+			memory.requestInterrupt(0x02); // STAT IF
+		}
+		prevMode = newMode;
 	}
-
 }
-
 
 
 void initFrame() {
@@ -123,12 +93,6 @@ uint16_t searchAddr = 0xFE00;
 
 uint8_t curItemsOnScanline = 0;
 
-//struct Sprite {
-//	uint8_t x;
-//	uint8_t y;
-//	uint8_t ti;
-//	uint8_t attr;
-//};
 
 std::vector<Sprite> scanlineQueue{};
 
@@ -141,7 +105,7 @@ void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE
 	}
 	else
 	{
-		uint8_t oamY = memory.readPPU(searchAddr);
+		uint8_t oamY = memory.read(searchAddr);
 
 		if (currentLY >= oamY-16  && currentLY < oamY-16+8 && curItemsOnScanline <=10)
 		{
@@ -149,9 +113,9 @@ void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE
 			curItemsOnScanline++;
 			Sprite sprite;
 			sprite.y = oamY; // this should be fine,   // y
-			sprite.x = memory.readPPU(searchAddr + 1); // x 
-			sprite.ti = memory.readPPU(searchAddr + 2); // tile index
-			sprite.attr = memory.readPPU(searchAddr + 3); // attributes
+			sprite.x = memory.read(searchAddr + 1); // x 
+			sprite.ti = memory.read(searchAddr + 2); // tile index
+			sprite.attr = memory.read(searchAddr + 3); // attributes
 
 			//std::cout << "added at ti: x " <<(int)sprite.x << " y : " << (int) sprite.y << " "<< (int)sprite.ti << std::endl;
 			scanlineQueue.push_back(sprite);
@@ -200,7 +164,7 @@ void PPU::fetchTileNo()
 	bgx = (memory.ioFetchSCX() + fetcherX) % 256;
 	bgy = (memory.ioFetchSCY() + currentLY) % 256;
 	 
-	tileNumber = (memory.readPPU(memAddr + (bgx / 8) + (bgy / 8) *32));
+	tileNumber = (memory.read(memAddr + (bgx / 8) + (bgy / 8) *32));
 }
 
 uint8_t tileDataA{};
@@ -215,12 +179,12 @@ void PPU:: fetchTileL()
 	if ((memory.ioFetchLCDC() & 0x10))
 	{
 		memAddr = 0x8000;
-		tileDataA = memory.readPPU( memAddr + (tileNumber * 0x10) + (fineY *2) );
+		tileDataA = memory.read( memAddr + (tileNumber * 0x10) + (fineY *2) );
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataA = memory.readPPU(memAddr + ((int8_t)tileNumber*16) + fineY * 2);
+		tileDataA = memory.read(memAddr + ((int8_t)tileNumber*16) + fineY * 2);
 
 	}
 }
@@ -233,14 +197,14 @@ void PPU::fetchTileH()
 	if ((memory.ioFetchLCDC() & 0x10))
 	{
 		memAddr = 0x8000;
-		tileDataB = memory.readPPU(1+(memAddr + (tileNumber * 0x10) + (fineY * 2)));
+		tileDataB = memory.read(1+(memAddr + (tileNumber * 0x10) + (fineY * 2)));
 
 
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataB = memory.readPPU(1+ (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
+		tileDataB = memory.read(1+ (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
 	}
 }
 
@@ -266,7 +230,7 @@ void PPU::fetchWindowTileNo()
 		if (currentLY >= winy)
 		{
 			windowY = currentLY - winy;
-			tileNumber = (memory.readPPU(memAddr + ((fetcherX - (winx)) / 8) + (windowY / 8) * 32));
+			tileNumber = (memory.read(memAddr + ((fetcherX - (winx)) / 8) + (windowY / 8) * 32));
 			renderingWindow = true;
 		}
 	}
@@ -281,12 +245,12 @@ void PPU::fetchWindowTileL()
 	if (memory.ioFetchLCDC() & 0x10)
 	{
 		memAddr = 0x8000;
-		tileDataA = memory.readPPU(memAddr + (tileNumber * 0x10) + (fineY * 2));
+		tileDataA = memory.read(memAddr + (tileNumber * 0x10) + (fineY * 2));
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataA = memory.readPPU(memAddr + ((int8_t)tileNumber * 16) + fineY * 2);
+		tileDataA = memory.read(memAddr + ((int8_t)tileNumber * 16) + fineY * 2);
 	}
 }
 
@@ -299,12 +263,12 @@ void PPU::fetchWindowTileH()
 	if (memory.ioFetchLCDC() & 0x10)
 	{
 		memAddr = 0x8000;
-		tileDataB = memory.readPPU(1 + (memAddr + (tileNumber * 0x10) + (fineY * 2)));
+		tileDataB = memory.read(1 + (memAddr + (tileNumber * 0x10) + (fineY * 2)));
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataB = memory.readPPU(1 + (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
+		tileDataB = memory.read(1 + (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
 	}
 }
 
@@ -334,8 +298,8 @@ void PPU::fetchSpriteTile(const Sprite& sprite)
 	}
 
 	uint16_t addr = 0x8000 + (tileIndex * 16) + spriteY * 2;
-	uint8_t dataLo = memory.readPPU(addr);
-	uint8_t dataHi = memory.readPPU(addr + 1);
+	uint8_t dataLo = memory.read(addr);
+	uint8_t dataHi = memory.read(addr + 1);
 
 	for (int i = 7; i >= 0; i--)
 	{
@@ -431,7 +395,15 @@ void PPU::drawPixel()
 		return;
 
 	uint8_t bgColor = backgroundFifo.front();
-	uint8_t finalColor = bgColor;
+
+
+	uint8_t BGP = memory.read(0xff47);
+	uint8_t finalColor = (BGP >> (bgColor * 2)) & 0x03;
+
+	//finalColor = (internalX / 8 + currentLY / 8) % 4; // THIS IS DEBUG, RMEOVE LATER, DEBUG
+
+
+
 
 	if (!spriteFifo.empty()) {
 		SpritePixel spx = spriteFifo.front();
@@ -484,12 +456,9 @@ void PPU::executeTick() // measured in m cycles
 
 	if (memory.writeToLYC() )
 	{
-		updateSTAT();
-
-		if (memory.ioFetchLY() == memory.ioFetchLYC())
-		{
-			memory.ioWriteStat(memory.ioFetchSTAT() | 0x04);
-		}
+		//updateSTAT();
+		
+		updateLYC();
 	}
 
 	if (currentLY >= 144) 
@@ -503,7 +472,8 @@ void PPU::executeTick() // measured in m cycles
 			mode2Tick();
 			memory.vramLocked = false;
 			currentMode = 0b10;
-			updateSTAT();
+			updateMode(0b10);
+			//updateSTAT();
 		}
 		else 
 		{
@@ -517,7 +487,8 @@ void PPU::executeTick() // measured in m cycles
 				mode3Tick();
 
 				currentMode = 0b11;
-				updateSTAT();
+				updateMode(0b11);
+				//updateSTAT();
 
 				mode3Dots++;
 			}
@@ -535,7 +506,8 @@ void PPU::executeTick() // measured in m cycles
 					memory.vramLocked = false;
 					
 					currentMode = 0b0;
-					updateSTAT();
+					//updateSTAT();
+					updateMode(0b0);
 				}
 
 
@@ -548,7 +520,6 @@ void PPU::executeTick() // measured in m cycles
 
 			//this section is when the ly changes and everything increments
 
-
 			searchAddr = 0xFE00;
 			scanlineQueue.clear();
 			curItemsOnScanline = 0;
@@ -559,25 +530,9 @@ void PPU::executeTick() // measured in m cycles
 			
 			fetcherX = 0;
 			internalX = 0;
-			//check if ly == lyc
-			if (memory.ioFetchLY() == memory.ioFetchLYC())
-			{
-				memory.ioWriteStat(memory.ioFetchSTAT() | 0x04);
-			}
-			else
-			{
-				memory.ioWriteStat(memory.ioFetchSTAT() & ~0x04);
-			}
-
 
 			memory.ioIncrementLY();
-
-			updateSTAT();
-
-			if (memory.ioFetchLY() == memory.ioFetchLYC())
-			{
-				memory.ioWriteStat(memory.ioFetchSTAT() | 0x04);
-			}
+			updateLYC();
 
 		}
 	}
@@ -592,7 +547,8 @@ void PPU::mode1Tick()
 {
 	if (enteredModeOne) {
 		currentMode = 0b1;
-		updateSTAT();
+		//updateSTAT();
+		updateMode(0b1);
 
 		// request VBlank IF
 		memory.ioWriteIF(memory.ioFetchIF() | 0x01);
@@ -600,17 +556,14 @@ void PPU::mode1Tick()
 		enteredModeOne = false;
 	}
 
-	if (internalDot >= 456)
-	{
+	if (internalDot >= 456) {
 		resetVals();
 		internalDot = 0;
 
-		if (currentLY == 153) {
-			memory.ioWriteLY(0);
-		}
-		else {
-			memory.ioIncrementLY();
-		}
+		uint8_t ly = memory.ioFetchLY() + 1;
+		if (ly > 153) ly = 0;
+		memory.ioWriteLY(ly);
+		updateLYC();         
 	}
 }
 

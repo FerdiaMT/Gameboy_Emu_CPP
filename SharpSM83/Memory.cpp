@@ -234,10 +234,10 @@ void Memory::write(uint16_t address, uint8_t data)
 	{
 
 
-		if (address == 0xFF02 && data == 0x81) {
-			char c = read(0xFF01);
-			std::cout << c; 
-		}
+		//if (address == 0xFF02 && data == 0x81) {
+		//	char c = read(0xFF01);
+		//	std::cout << c; 
+		//}
 
 
 		if (address == 0xFF04)
@@ -512,6 +512,9 @@ void Memory::ioWriteTAC(uint8_t data)
 	io[0x7] = data;
 }
 
+void Memory::ioWriteIFNonPPU(uint8_t val) {
+	io[0x0F] &= ~(val & 0x1F);
+}
 
 void Memory::ioWriteIF(uint8_t val) { // this is currently resevred to JUST t he ppu, not the cpu
     io[0x0F] |= val;
@@ -529,7 +532,7 @@ void Memory::ioWriteLY(uint8_t data)
 
 void Memory::ioWriteStat(uint8_t val) {
 	uint8_t cur = io[0x41];
-	io[0x41] = (cur & 0x07) | (val & 0xF8);
+	io[0x41] = (cur & 0x07) | (val & 0xf8); // f8?
 }
 
 
@@ -572,9 +575,10 @@ void Memory::setInterruptJoypad()
 
 
 void Memory::requestInterrupt(uint8_t mask) {
-	io[0x0F] = io[0x0F] | (mask & 0x1F); 
+	uint8_t before = io[0x0F] & 0x1F;
+	uint8_t after = before | (mask & 0x1F);
+	io[0x0F] = after | 0xE0;
 }
-
 void Memory::clearInterrupt(uint8_t mask) {
-	io[0x0F] = io[0x0F] & ~(mask & 0x1F);
+	io[0x0F] = (io[0x0F] & ~(mask & 0x1F)) | 0xE0;
 }

@@ -22,13 +22,8 @@ public:
 	void executeTick();
 
 	void updateScreenBuffer(uint8_t(&mainScreen)[160][144]);
-	
-	void writeIntoSTAT(uint8_t x );
 
 	uint16_t getInternalDot();
-
-	void updateSTAT();
-	void checkSTATInterrupts();
 
 
 private:
@@ -57,7 +52,10 @@ private:
 
 	void tileFetcher();
 
+	void updateMode(uint8_t newMode);
 	void fetchSpriteTile(const Sprite& sprite);
+	void updateLYC();
+
 
 };
 #endif

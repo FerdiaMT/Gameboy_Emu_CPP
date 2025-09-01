@@ -97,6 +97,8 @@ public:
 	void requestInterrupt(uint8_t mask);
 	void clearInterrupt(uint8_t mask);
 
+	void ioWriteIFNonPPU(uint8_t val);
+
 
 private:
 

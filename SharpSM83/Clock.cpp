@@ -10,13 +10,13 @@
 /*
 The timer uses the following memory registers:
 
-DIV (0xFF04): the divider register increments at a fixed rate of 16,384 Hz. 
+DIV (0xFF04): the divider register increments at a fixed rate of 16,384 Hz.
 This means that we have to increment DIV’s value every 256 clock cycles (4,194,304 / 16,384 = 256).
 
-TIMA (0xFF05): the timer register increments at a configurable frequency. 
+TIMA (0xFF05): the timer register increments at a configurable frequency.
 In this case, we have to update it every 16, 64, 256 or 1024 clock cycles depending on the frequency
-set in the TAC register (see how the previous clock cycle value was calculated). 
-When TIMA overflows an interrupt is triggered and it’s value is reset to TMA’s value. 
+set in the TAC register (see how the previous clock cycle value was calculated).
+When TIMA overflows an interrupt is triggered and it’s value is reset to TMA’s value.
 TIMA should only be counting if the timer is enabled in the TAC register.
 
 TMA (0xFF06): this value is used when TIMA overflows.
@@ -42,9 +42,9 @@ TAC (0xFF07): Timer Control, it has the following structure:
 
 //953.674316406 nanosecond wait period per machine cycle 
 
-Clock::Clock(Memory& memory) : memory(memory) // 1 machine cycle = 4 clock cycles (t)
+Clock::Clock(Memory & memory) : memory(memory) // 1 machine cycle = 4 clock cycles (t)
 {
-	// basically we want to advance clock cycles, and then see what we should do
+    // basically we want to advance clock cycles, and then see what we should do
 }
 
 void Clock::resetClock()
@@ -82,47 +82,44 @@ int clockCycle{};
 
 void Clock::resetClockCycle()
 {
-    clockCycle = 0;
+    //clockCycle = 0;
 }
 
 
-int timaReloadDelay = -1;   
-bool timaWillReload = false; 
+int timaReloadDelay = -1;
+bool timaWillReload = false;
 
 
-void Clock::executeTick() 
+void Clock::executeTick()
 {
     uint16_t prevDivCounter = divCounter;
     divCounter++;
-    memory.ioWriteDIV(divCounter >> 8);
+    memory.ioWriteDIV(static_cast<uint8_t>(divCounter >> 8));
 
     fetchTac();
 
-    if (Tac & 0b100) 
+    if (Tac & 0b100)
     {
         int bit = 0;
-        switch (Tac & 0b11) 
+        switch (Tac & 0b11)
         {
-        case 0: bit = 9; break; 
-        case 1: bit = 3; break;  
-        case 2: bit = 5; break;  
-        case 3: bit = 7; break; 
+        case 0: bit = 9; break;
+        case 1: bit = 3; break;
+        case 2: bit = 5; break;
+        case 3: bit = 7; break;
         }
 
-        bool prevBit = (prevDivCounter >> bit) & 1;
-        bool currBit = (divCounter >> bit) & 1;
+        bool prevBit = ((prevDivCounter >> bit) & 1) != 0;
+        bool currBit = ((divCounter >> bit) & 1) != 0;
 
-        if (prevBit == 1 && currBit == 0)
+        if (prevBit && !currBit)
         {
             if (!timaWillReload)
             {
-                if (memory.ioFetchTIMA() == 0xFF)
+                uint8_t tima = memory.ioFetchTIMA();
+                if (tima == 0xFF)
                 {
                     memory.ioWriteTIMA(0x00);
-
-
-                    memory.requestInterrupt(0x04);
-
                     timaReloadDelay = 4;
                     timaWillReload = true;
                 }
@@ -140,8 +137,8 @@ void Clock::executeTick()
         timaReloadDelay--;
         if (timaReloadDelay == 0)
         {
-
             memory.ioWriteTIMA(memory.ioFetchTMA());
+            memory.requestInterrupt(0x04);
             timaWillReload = false;
             timaReloadDelay = -1;
         }

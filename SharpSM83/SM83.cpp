@@ -2508,53 +2508,52 @@ uint8_t IE{};
 
 void SM83::handleInterrupts() // ive got IF set to 2 when it should be 0 somehow
 {
-	uint8_t IF = memory.read(0xFF0F);
+	uint8_t IF = memory.ioFetchIF();
 	uint8_t IE = memory.ioFetchIE();
 
 	if (!IME) return;
 
-	if (IF & 0b1 && IE & 0b1) //bit0 vBlank
-	{
-		//the corresponding IF bit and IME flag are reset
-		// 0xFF0F IF address
-		memory.write(0xFF0F, (IF &= 0b11111110));
+	if ((IF & 0x01) && (IE & 0x01)) { // VBlank
+		std::cout << "VBLANK" << std::endl;
+		memory.clearInterrupt(0x01);
 		IME = false;
 		call(0x0040);
 		addCycle(5);
-		//std::cout << "VBLANK INTERRUPT" << std::endl;
 	}
-	if (IF & 0b10 && IE & 0b10) //bit1 LCDstat
-	{
-		memory.write(0xFF0F, (IF &= 0b11111101));
+	else if ((IF & 0x02) && (IE & 0x02)) { // LCD STAT
+		std::cout << "LCD" << std::endl;
+		memory.clearInterrupt(0x02);
 		IME = false;
 		call(0x0048);
 		addCycle(5);
-		std::cout << "LCD INTERRUPT" << std::endl;
 	}
-	if (IF & 0b100 && IE & 0b100) //bit2 Timer
-	{
-		memory.write(0xFF0F, (IF &= 0b11111011));
+	else if ((IF & 0x04) && (IE & 0x04)) { // Timer
+		std::cout << "TIMER" << std::endl;
+		memory.clearInterrupt(0x04);
 		IME = false;
 		call(0x0050);
 		addCycle(5);
-		std::cout << "TIMER INTERRUPT" << std::endl;
 	}
-	if (IF & 0b1000 && IE & 0b1000) //bit3 Serial
-	{
-		memory.write(0xFF0F, (IF &= 0b11110111));
+	else if ((IF & 0x08) && (IE & 0x08)) { // Serial
+		std::cout << "SERIAL" << std::endl;
+		memory.clearInterrupt(0x08);
 		IME = false;
 		call(0x0058);
 		addCycle(5);
 	}
-	if (IF & 0b10000 && IE & 0b10000) //bit4 Joypad
-	{
-		memory.write(0xFF0F, (IF &= 0b11101111));
+	else if ((IF & 0x10) && (IE & 0x10)) { // Joypad
+		std::cout << "JOYPAD" << std::endl;
+		memory.clearInterrupt(0x10);
 		IME = false;
 		call(0x0060);
 		addCycle(5);
 	}
 
 }
+
+
+
+
 
 uint16_t previousOP{};
 
@@ -2565,6 +2564,7 @@ uint8_t SM83::executeInstruction()
 {
 	cycles = 0;
 	previousOP = reg.PC;
+
 	//if (!halted)
 	//{
 	//logCPUState();
@@ -2575,10 +2575,10 @@ uint8_t SM83::executeInstruction()
 		memory.dmaPending = false;
 		//std::cout << "DMA";
 		return 160*4; // TODO: double heck this number
+		std::cout << "DMA CALLED finalColor = (BGP >> (bgColor * 2)) & 0x03;";
 	}
 
-	uint8_t IF = memory.ioFetchIF();
-	uint8_t IE = memory.ioFetchIE();
+
 
 	if (halted) {
 		std::cout << "HALTED" << std::endl;
@@ -2593,9 +2593,15 @@ uint8_t SM83::executeInstruction()
 		}
 		return 1;
 	}
+	uint8_t IF = memory.ioFetchIF();
+	uint8_t IE = memory.ioFetchIE();
 
 	if (IME && ((IF & IE & 0x1F) != 0))
 	{
+		//uint8_t iflag = memory.ioFetchIF();
+		//iflag &= ~0x08; // force Serial off
+		//memory.ioWriteIFNonPPU(iflag);
+
 		handleInterrupts();
 	}
 
