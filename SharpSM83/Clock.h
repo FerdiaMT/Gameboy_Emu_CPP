@@ -7,7 +7,7 @@
 class Clock
 {
 public:
-	Clock(Memory& memory);
+	Clock(Memory* memory);
 	void resetClock();
 	void handleTimers(int allCycles);
 

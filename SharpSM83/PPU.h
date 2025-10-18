@@ -17,7 +17,7 @@ class PPU
 {
 public:
 
-	PPU(Memory& memory);
+	PPU(Memory* memory);
 	void resetPPU();
 
 	void step(int cycles);
@@ -30,7 +30,7 @@ public:
 
 private:
 
-	Memory& memory;
+	Memory* memory;
 
 	void mode2Tick();
 	void mode3Tick();

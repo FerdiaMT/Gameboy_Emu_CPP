@@ -168,7 +168,7 @@ void SM83::debugRegs()
 
 bool halted = false;
 
-SM83::SM83(Memory& memory) : memory(memory) {};
+SM83::SM83(Memory* memory) : memory(memory) {};
 
 inline void clearFlags() { //inline is replace the code directly during compile
 	reg.F = 0;

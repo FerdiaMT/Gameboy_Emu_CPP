@@ -3,6 +3,8 @@
 #include "Memory.h"
 #include "PPU.h"
 #include "Clock.h"
+#include "Input.h"
+#include "Clock.h"
 #include <fstream>
 
 #include <stdio.h>

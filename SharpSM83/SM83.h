@@ -61,7 +61,7 @@ public:
 	void debugRegs();
 
 
-	SM83(Memory& memory);
+	SM83(Memory* memory);
 	void reset();
 	void executeCycle(double cyclesAvailable);
 	uint8_t executeInstruction();
@@ -79,7 +79,7 @@ public:
 
 private:
 
-	Memory& memory;
+	Memory* memory;
 	uint16_t popStack();
 	void call(uint16_t jumpAddr);
 	void push(uint16_t pushData);

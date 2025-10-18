@@ -42,22 +42,9 @@ TAC (0xFF07): Timer Control, it has the following structure:
 
 //953.674316406 nanosecond wait period per machine cycle 
 
-Clock::Clock(Memory & memory) : memory(memory) // 1 machine cycle = 4 clock cycles (t)
+Clock::Clock(Memory *memory) : memory(memory) // 1 machine cycle = 4 clock cycles (t)
 {
     // basically we want to advance clock cycles, and then see what we should do
-}
-
-void Clock::resetClock()
-{
-}
-
-int modulo{};
-
-uint8_t Tac{};
-
-void Clock::fetchTac()
-{
-    Tac = memory.ioFetchTAC();
 }
 
 int tacModulo()
@@ -91,13 +78,7 @@ bool timaWillReload = false;
 
 
 void Clock::step(int amt) {
-    for (int i = 0; i < amt; i++) {
-        executeTick();
-    }
-}
 
-void Clock::executeTick()
-{
     uint16_t prevDivCounter = divCounter;
     divCounter++;
     memory.ioWriteDIV(static_cast<uint8_t>(divCounter >> 8));

@@ -27,7 +27,7 @@ uint8_t currentLY{};
 
 // resource used -> https://hacktix.github.io/GBEDG/ppu/#oam-scan-mode-2
 
-PPU::PPU(Memory& memory) : memory(memory) //m cycle (using this) = 4 t states
+PPU::PPU(Memory* memory) : memory(memory) //m cycle (using this) = 4 t states
 {
 
 }
