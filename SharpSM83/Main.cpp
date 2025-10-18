@@ -342,7 +342,7 @@ int main()
     Gameboy gb;
 
     std::ifstream file("02.gb", std::ios::binary | std::ios::ate);
-    bool skipBootROM = true; 
+
     if (file.is_open())
     {
         std::streampos size = file.tellg();
@@ -405,7 +405,15 @@ int main()
             gb.step();
         }
 
+        SDL_UpdateTexture(texture, nullptr, gb.ppu.framebuffer, 160 * sizeof(uint32_t));
+        SDL_RenderClear(renderer);
+        SDL_RenderTexture(renderer, texture, nullptr, nullptr);
+        SDL_RenderPresent(renderer);
+
+        SDL_Delay(16); // this delays it enough to act as 60fps
+
     }
+    SDL_DestroyTexture(texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();

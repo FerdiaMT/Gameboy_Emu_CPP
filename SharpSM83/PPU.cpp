@@ -448,6 +448,12 @@ void resetVals()
 
 bool enteredModeOne = true;
 
+void PPU::step(int cycles) {
+	for (int i = 0; i < cycles; i++) {
+		executeTick();
+	}
+}
+
 void PPU::executeTick() // measured in m cycles
 {
 

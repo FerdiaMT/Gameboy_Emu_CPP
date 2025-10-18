@@ -10,6 +10,8 @@ public:
 	Clock(Memory& memory);
 	void resetClock();
 	void handleTimers(int allCycles);
+
+	void step(int amt);
 	void executeTick();
 	void resetClockCycle();
 

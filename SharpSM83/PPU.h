@@ -16,9 +16,11 @@ struct Sprite {
 class PPU
 {
 public:
+
 	PPU(Memory& memory);
 	void resetPPU();
 
+	void step(int cycles);
 	void executeTick();
 
 	void updateScreenBuffer(uint8_t(&mainScreen)[160][144]);

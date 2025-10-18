@@ -90,6 +90,12 @@ int timaReloadDelay = -1;
 bool timaWillReload = false;
 
 
+void Clock::step(int amt) {
+    for (int i = 0; i < amt; i++) {
+        executeTick();
+    }
+}
+
 void Clock::executeTick()
 {
     uint16_t prevDivCounter = divCounter;
