@@ -13,6 +13,7 @@ public:
     SM83 cpu;
     PPU ppu;
     Clock timer;
+    Input input;
 
     Gameboy();
     bool loadROM(const char* filename);

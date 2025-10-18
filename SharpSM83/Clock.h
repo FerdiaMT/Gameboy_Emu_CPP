@@ -7,19 +7,16 @@
 class Clock
 {
 public:
+	Memory* memory;
 	Clock(Memory* memory);
-	void resetClock();
-	void handleTimers(int allCycles);
+
 
 	void step(int amt);
-	void executeTick();
-	void resetClockCycle();
 
-	uint16_t divCounter{};
+	int divCounter;
+	int timaCounter;
 private:
-	Memory& memory;
-
-	void fetchTac();
+	
 
 };
 #endif

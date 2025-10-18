@@ -1,6 +1,6 @@
 #include "PPU.h"
 #include "SM83.h"
-#include "memory.h"
+#include "memory"
 #include <iostream>
 #include <queue>
 #include <cstring>
@@ -41,31 +41,31 @@ uint8_t currentMode{};
 
 
 void PPU::updateLYC() {
-	uint8_t stat = memory.readPPU(0xFF41);
-	uint8_t ly = memory.readPPU(0xFF44);
-	uint8_t lyc = memory.readPPU(0xFF45);
+	uint8_t stat = memory->read(0xFF41);
+	uint8_t ly = memory->read(0xFF44);
+	uint8_t lyc = memory->read(0xFF45);
 
 	bool coincBefore = (stat & 0x04) != 0;
 	bool coincNow = (ly == lyc);
 
 	// write coincidence flag
 	stat = coincNow ? (stat | 0x04) : (stat & ~0x04);
-	memory.writePPU(0xFF41, stat);
+	memory->write(0xFF41, stat);
 
 	// edge-trigger STAT IF if enabled
 	if (!coincBefore && coincNow && (stat & 0x40)) {
-		memory.requestInterrupt(0x02);
+		memory->requestInterrupt(0x02);
 	}
 }
 
 void PPU::updateMode(uint8_t newMode) {
 	static uint8_t prevMode = 0xFF;
-	uint8_t stat = memory.readPPU(0xFF41);
+	uint8_t stat = memory->read(0xFF41);
 
 	if (newMode != prevMode) {
 		// set mode bits
 		stat = (stat & ~0x03) | newMode;
-		memory.writePPU(0xFF41, stat);
+		memory->write(0xFF41, stat);
 
 		bool req = false;
 		if (newMode == 0 && (stat & 0x08)) req = true; // HBlank
@@ -73,7 +73,7 @@ void PPU::updateMode(uint8_t newMode) {
 		if (newMode == 2 && (stat & 0x20)) req = true; // OAM
 
 		if (req) {
-			memory.requestInterrupt(0x02); // STAT IF
+			memory->requestInterrupt(0x02); // STAT IF
 		}
 		prevMode = newMode;
 	}
@@ -105,7 +105,7 @@ void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE
 	}
 	else
 	{
-		uint8_t oamY = memory.read(searchAddr);
+		uint8_t oamY = memory->read(searchAddr);
 
 		if (currentLY >= oamY-16  && currentLY < oamY-16+8 && curItemsOnScanline <=10)
 		{
@@ -113,9 +113,9 @@ void PPU::mode2Tick()  // TODO : DOUBLE TALL SPRITE
 			curItemsOnScanline++;
 			Sprite sprite;
 			sprite.y = oamY; // this should be fine,   // y
-			sprite.x = memory.read(searchAddr + 1); // x 
-			sprite.ti = memory.read(searchAddr + 2); // tile index
-			sprite.attr = memory.read(searchAddr + 3); // attributes
+			sprite.x = memory->read(searchAddr + 1); // x 
+			sprite.ti = memory->read(searchAddr + 2); // tile index
+			sprite.attr = memory->read(searchAddr + 3); // attributes
 
 			//std::cout << "added at ti: x " <<(int)sprite.x << " y : " << (int) sprite.y << " "<< (int)sprite.ti << std::endl;
 			scanlineQueue.push_back(sprite);
@@ -152,7 +152,7 @@ bool windowTriggered = false;
 
 void PPU::fetchTileNo()
 {
-	if ((memory.ioFetchLCDC() & 0b1000))
+	if ((memory->ioFetchLCDC() & 0b1000))
 	{
 		memAddr = 0x9C00;
 	}
@@ -161,10 +161,10 @@ void PPU::fetchTileNo()
 		memAddr = 0x9800;
 	}
 
-	bgx = (memory.ioFetchSCX() + fetcherX) % 256;
-	bgy = (memory.ioFetchSCY() + currentLY) % 256;
+	bgx = (memory->ioFetchSCX() + fetcherX) % 256;
+	bgy = (memory->ioFetchSCY() + currentLY) % 256;
 	 
-	tileNumber = (memory.read(memAddr + (bgx / 8) + (bgy / 8) *32));
+	tileNumber = (memory->read(memAddr + (bgx / 8) + (bgy / 8) *32));
 }
 
 uint8_t tileDataA{};
@@ -176,15 +176,15 @@ void PPU:: fetchTileL()
 	uint8_t fineY = (bgy) % 8;
 
 
-	if ((memory.ioFetchLCDC() & 0x10))
+	if ((memory->ioFetchLCDC() & 0x10))
 	{
 		memAddr = 0x8000;
-		tileDataA = memory.read( memAddr + (tileNumber * 0x10) + (fineY *2) );
+		tileDataA = memory->read( memAddr + (tileNumber * 0x10) + (fineY *2) );
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataA = memory.read(memAddr + ((int8_t)tileNumber*16) + fineY * 2);
+		tileDataA = memory->read(memAddr + ((int8_t)tileNumber*16) + fineY * 2);
 
 	}
 }
@@ -194,17 +194,17 @@ void PPU::fetchTileH()
 
 	uint8_t fineY = (bgy) % 8;
 
-	if ((memory.ioFetchLCDC() & 0x10))
+	if ((memory->ioFetchLCDC() & 0x10))
 	{
 		memAddr = 0x8000;
-		tileDataB = memory.read(1+(memAddr + (tileNumber * 0x10) + (fineY * 2)));
+		tileDataB = memory->read(1+(memAddr + (tileNumber * 0x10) + (fineY * 2)));
 
 
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataB = memory.read(1+ (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
+		tileDataB = memory->read(1+ (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
 	}
 }
 
@@ -213,9 +213,9 @@ void PPU::fetchTileH()
 
 void PPU::fetchWindowTileNo()
 {
-	if ((memory.ioFetchLCDC() & 0b01000000))
+	if ((memory->ioFetchLCDC() & 0b01000000))
 	{
-		if ((memory.ioFetchLCDC() & 0b1000))
+		if ((memory->ioFetchLCDC() & 0b1000))
 		{
 			memAddr = 0x9C00;
 		}
@@ -224,13 +224,13 @@ void PPU::fetchWindowTileNo()
 			memAddr = 0x9800;
 		}
 
-		uint8_t winx = memory.ioFetchWX() - 7;
-		uint8_t winy = memory.ioFetchWY();
+		uint8_t winx = memory->ioFetchWX() - 7;
+		uint8_t winy = memory->ioFetchWY();
 
 		if (currentLY >= winy)
 		{
 			windowY = currentLY - winy;
-			tileNumber = (memory.read(memAddr + ((fetcherX - (winx)) / 8) + (windowY / 8) * 32));
+			tileNumber = (memory->read(memAddr + ((fetcherX - (winx)) / 8) + (windowY / 8) * 32));
 			renderingWindow = true;
 		}
 	}
@@ -242,15 +242,15 @@ void PPU::fetchWindowTileL()
 
 	uint8_t fineY = windowY % 8;
 
-	if (memory.ioFetchLCDC() & 0x10)
+	if (memory->ioFetchLCDC() & 0x10)
 	{
 		memAddr = 0x8000;
-		tileDataA = memory.read(memAddr + (tileNumber * 0x10) + (fineY * 2));
+		tileDataA = memory->read(memAddr + (tileNumber * 0x10) + (fineY * 2));
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataA = memory.read(memAddr + ((int8_t)tileNumber * 16) + fineY * 2);
+		tileDataA = memory->read(memAddr + ((int8_t)tileNumber * 16) + fineY * 2);
 	}
 }
 
@@ -260,15 +260,15 @@ void PPU::fetchWindowTileH()
 
 	uint8_t fineY = windowY % 8;
 
-	if (memory.ioFetchLCDC() & 0x10)
+	if (memory->ioFetchLCDC() & 0x10)
 	{
 		memAddr = 0x8000;
-		tileDataB = memory.read(1 + (memAddr + (tileNumber * 0x10) + (fineY * 2)));
+		tileDataB = memory->read(1 + (memAddr + (tileNumber * 0x10) + (fineY * 2)));
 	}
 	else
 	{ //8800 mode
 		memAddr = 0x9000;
-		tileDataB = memory.read(1 + (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
+		tileDataB = memory->read(1 + (memAddr + ((int8_t)tileNumber * 16) + fineY * 2));
 	}
 }
 
@@ -281,7 +281,7 @@ bool pixelOutputMode = false;
 
 void PPU::fetchSpriteTile(const Sprite& sprite)
 {
-	uint8_t spriteHeight = (memory.ioFetchLCDC() & 0x04) ? 16 : 8;
+	uint8_t spriteHeight = (memory->ioFetchLCDC() & 0x04) ? 16 : 8;
 
 	int16_t spriteY = currentLY - (sprite.y - 16);
 	if (spriteY < 0 || spriteY >= spriteHeight) return;
@@ -298,8 +298,8 @@ void PPU::fetchSpriteTile(const Sprite& sprite)
 	}
 
 	uint16_t addr = 0x8000 + (tileIndex * 16) + spriteY * 2;
-	uint8_t dataLo = memory.read(addr);
-	uint8_t dataHi = memory.read(addr + 1);
+	uint8_t dataLo = memory->read(addr);
+	uint8_t dataHi = memory->read(addr + 1);
 
 	for (int i = 7; i >= 0; i--)
 	{
@@ -334,8 +334,8 @@ void PPU::tileFetcher()
 {
 	if (fetcherX < 160) 
 	{
-		uint8_t winx = memory.ioFetchWX() - 7;
-		bool windowActive = (memory.ioFetchLCDC() & 0b01000000) &&(memory.ioFetchWY() <= currentLY) &&(fetcherX >= winx) && (winx <= 166); 
+		uint8_t winx = memory->ioFetchWX() - 7;
+		bool windowActive = (memory->ioFetchLCDC() & 0b01000000) &&(memory->ioFetchWY() <= currentLY) &&(fetcherX >= winx) && (winx <= 166); 
 
 		if (windowActive && !windowTriggered)
 		{
@@ -397,7 +397,7 @@ void PPU::drawPixel()
 	uint8_t bgColor = backgroundFifo.front();
 
 
-	uint8_t BGP = memory.read(0xff47);
+	uint8_t BGP = memory->read(0xff47);
 	uint8_t finalColor = (BGP >> (bgColor * 2)) & 0x03;
 
 	//finalColor = (internalX / 8 + currentLY / 8) % 4; // THIS IS DEBUG, RMEOVE LATER, DEBUG
@@ -458,9 +458,9 @@ void PPU::executeTick() // measured in m cycles
 {
 
 
-	currentLY = memory.ioFetchLY();
+	currentLY = memory->ioFetchLY();
 
-	if (memory.writeToLYC() )
+	if (memory->writeToLYC() )
 	{
 		//updateSTAT();
 		
@@ -476,7 +476,7 @@ void PPU::executeTick() // measured in m cycles
 		if (internalDot < 80)
 		{
 			mode2Tick();
-			memory.vramLocked = false;
+			memory->vramLocked = false;
 			currentMode = 0b10;
 			updateMode(0b10);
 			//updateSTAT();
@@ -488,7 +488,7 @@ void PPU::executeTick() // measured in m cycles
 			if (!mode3Complete)
 			{
 
-				memory.vramLocked = true;
+				memory->vramLocked = true;
 
 				mode3Tick();
 
@@ -509,7 +509,7 @@ void PPU::executeTick() // measured in m cycles
 				}
 				else  //mode 0
 				{
-					memory.vramLocked = false;
+					memory->vramLocked = false;
 					
 					currentMode = 0b0;
 					//updateSTAT();
@@ -537,12 +537,12 @@ void PPU::executeTick() // measured in m cycles
 			fetcherX = 0;
 			internalX = 0;
 
-			memory.ioIncrementLY();
+			memory->ioIncrementLY();
 			updateLYC();
 
 		}
 	}
-	//std::cout << "DOT :" << (int)internalDot << " MODE3 dot " << mode3Dots << "   vram:Lock " << (int)memory.vramLocked << "  " << (int)fetcherX << std::endl;
+	//std::cout << "DOT :" << (int)internalDot << " MODE3 dot " << mode3Dots << "   vram:Lock " << (int)memory->vramLocked << "  " << (int)fetcherX << std::endl;
 	internalDot++;
 
 }
@@ -557,7 +557,7 @@ void PPU::mode1Tick()
 		updateMode(0b1);
 
 		// request VBlank IF
-		memory.ioWriteIF(memory.ioFetchIF() | 0x01);
+		memory->ioWriteIF(memory->ioFetchIF() | 0x01);
 
 		enteredModeOne = false;
 	}
@@ -566,9 +566,9 @@ void PPU::mode1Tick()
 		resetVals();
 		internalDot = 0;
 
-		uint8_t ly = memory.ioFetchLY() + 1;
+		uint8_t ly = memory->ioFetchLY() + 1;
 		if (ly > 153) ly = 0;
-		memory.ioWriteLY(ly);
+		memory->ioWriteLY(ly);
 		updateLYC();         
 	}
 }

@@ -16,7 +16,7 @@ struct Sprite {
 class PPU
 {
 public:
-
+	uint32_t framebuffer[160 * 144];
 	PPU(Memory* memory);
 	void resetPPU();
 

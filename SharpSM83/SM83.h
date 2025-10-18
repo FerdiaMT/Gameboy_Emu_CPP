@@ -55,8 +55,7 @@ extern registers reg;
 class SM83 {
 public:
 
-
-
+	uint16_t readWord(uint16_t  addr);
 
 	void debugRegs();
 

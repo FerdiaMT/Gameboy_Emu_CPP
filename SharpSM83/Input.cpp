@@ -39,7 +39,7 @@ void Input::keyDown(SDL_Scancode key) {
     if (wasPressed) {
         update();
         uint8_t IF = memory->read(0xFF0F);
-        mem->write(0xFF0F, IF | 0x10);
+        memory->write(0xFF0F, IF | 0x10);
     }
 }
 

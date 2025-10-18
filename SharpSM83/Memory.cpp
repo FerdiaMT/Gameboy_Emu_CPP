@@ -59,5 +59,6 @@ bool Memory::loadROM(const char* filename) {
 	std::ifstream file(filename, std::ios::binary);
 	if (!file) return false;
 	file.read((char*)rom, 0x8000);
-	std::cout << "ROAM LOADED "<< std::endl;
+	std::cout << "ROAM LOADED " << std::endl;
 	return true;
+}
