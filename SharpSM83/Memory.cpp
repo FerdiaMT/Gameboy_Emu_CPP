@@ -55,6 +55,30 @@ uint8_t Memory::read(uint16_t addr) {
 	else return IE;
 }
 
+void Memory::write(uint16_t addr, uint8_t val) {
+	if (addr < 0x8000) return; 
+	else if (addr < 0xA000) vram[addr - 0x8000] = val;
+	else if (addr < 0xC000) ram[addr - 0xA000] = val;
+	else if (addr < 0xE000) wram[addr - 0xC000] = val;
+	else if (addr < 0xFE00) wram[addr - 0xE000] = val; 
+	else if (addr < 0xFEA0) oam[addr - 0xFE00] = val;
+	else if (addr < 0xFF00) return; 
+	else if (addr < 0xFF80) {
+		if (addr == 0xFF04) io[0x04] = 0; 
+		else if (addr == 0xFF44) return; 
+		else if (addr == 0xFF46) {
+
+			uint16_t source = val << 8;
+			for (int i = 0; i < 0xA0; i++) {
+				oam[i] = read(source + i);
+			}
+		}
+		else io[addr - 0xFF00] = val;
+	}
+	else if (addr < 0xFFFF) hram[addr - 0xFF80] = val;
+	else IE = val;
+}
+
 bool Memory::loadROM(const char* filename) {
 	std::ifstream file(filename, std::ios::binary);
 	if (!file) return false;

@@ -1,9 +1,5 @@
-#include "SM83.h"
-#include "Memory.h"
-#include "PPU.h"
-#include "Clock.h"
-#include <fstream>
 
+#include <fstream>
 #include <stdio.h>
 #include <iostream>
 #include <cstdint>
@@ -110,7 +106,7 @@ int main()
 
     Gameboy gb;
 
-    if (!gb.loadROM("02.gb"))
+    if (!gb.loadROM("drMar.gb"))
     {
         std::cout << "COULDNT FIND ROM";
     }

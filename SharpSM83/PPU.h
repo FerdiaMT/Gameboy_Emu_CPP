@@ -16,21 +16,26 @@ struct Sprite {
 class PPU
 {
 public:
+	
+
+	Memory* memory;
 	uint32_t framebuffer[160 * 144];
+	int cycles;
+	int scnalineCounter;
+	bool frameReady;
+
 	PPU(Memory* memory);
 	void resetPPU();
-
 	void step(int cycles);
-	void executeTick();
 
-	void updateScreenBuffer(uint8_t(&mainScreen)[160][144]);
+	void renderScreen();
 
-	uint16_t getInternalDot();
+	uint32_t getColor(uint8_t colorId);
 
 
 private:
 
-	Memory* memory;
+	
 
 	void mode2Tick();
 	void mode3Tick();
