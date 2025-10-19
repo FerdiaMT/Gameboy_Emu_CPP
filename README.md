@@ -23,9 +23,9 @@ Uses SDL3 for rendering the graphics.
 - [x] CPU  
 - [x] Background and window rendering  
 - [x] Sprite rendering
-- [ ] Full cycle accurate interactions between CPU and PPU
-- [ ] Cartridge MBCs and save states
-- [ ] Built in Debugger
+- [x] Full cycle accurate interactions between CPU and PPU
+- [x] Cartridge MBCs
+- [ ] Save States
 - [ ] APU (sound) 
 
 
