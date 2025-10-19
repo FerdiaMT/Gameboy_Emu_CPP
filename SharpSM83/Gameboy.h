@@ -7,17 +7,18 @@
 #include "clock.h"
 #include "input.h"
 
-class Gameboy {
+class Gameboy
+{
 public:
-    Memory memory;
-    SM83 cpu;
-    PPU ppu;
-    Clock timer;
-    Input input;
+	Memory memory;
+	SM83 cpu;
+	PPU ppu;
+	Clock timer;
+	Input input;
 
-    Gameboy();
-    bool loadROM(const char* filename);
-    void step();
+	Gameboy();
+	bool loadROM(const char* filename);
+	void step();
 };
 
 #endif // GAMEBOY_H

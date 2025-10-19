@@ -6,16 +6,17 @@
 
 class Memory;
 
-class Input {
+class Input
+{
 public:
-    Memory* memory;
-    uint8_t buttons;
-    uint8_t dpad;
+	Memory* memory;
+	uint8_t buttons;
+	uint8_t dpad;
 
-    Input(Memory *memory);
-    void update();
-    void keyDown(SDL_Scancode key);
-    void keyUp(SDL_Scancode key);
+	Input(Memory* memory);
+	void update();
+	void keyDown(SDL_Scancode key);
+	void keyUp(SDL_Scancode key);
 };
 
 #endif // INPUT_H

@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstdint>
+#include "MBC.h"
 
 // forward decleration to remove wierd loop
 class Input;
@@ -12,7 +13,13 @@ class Memory
 public:
 
 	Memory();
+	~Memory();
+
 	Input* input;
+
+	uint8_t* fullROM;
+	uint32_t romSize;
+	MBC* mbc;
 
 	uint8_t rom[0x8000]{};
 	uint8_t vram[0x2000]{}; // video ram
@@ -26,7 +33,7 @@ public:
 
 	uint8_t read(uint16_t address);
 	void write(uint16_t address, uint8_t data);
-	
+
 	bool loadROM(const char* filename);
 
 private:

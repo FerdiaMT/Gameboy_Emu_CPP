@@ -1,2612 +1,632 @@
-#include "SM83.h"
-#include "memory"
-#include <cstdint>
-#include <unordered_map>
-#include <iostream>
-#include <bitset>
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <iomanip>
-
-registers reg;
-
-// FFFFEEEE DDDDCCCC : Thinking about flags
-//	        76543210	
-//			znhc
-
-//things to look into
-// - on gbdev for  carry for inc/dec byte, 
-// - on gbdev for zero in addTwoReg
-// - stop and halt have a "low power mode" ? 0x10 0x76
-// - 0xCB prefix mode : (
-// IME 
-
-/*
-* Z ~ Zero flag (set if result of operation is 0)
-*
-* n ~ Subtraction flag (was previous instruction a subtraction)
-* 
-* h ~ Half Carry flag (carry for lower 4 bits of result (decimal nums))
-* 
-* C ~ Carry flag (when byte+byte goes above 0xFF / 16 bit / subtraction <0)
-*/
-
-/* sources:
-* 
-* (opcode info)
-*  https://gbdev.io/gb-opcodes/optables/
-*  https://rgbds.gbdev.io/docs/v0.9.1/gbz80.7
-*  https://gbdev.io/pandocs/CPU_Instruction_Set.html
-* 
-* (emulation structure)
-* 
-*  https://cturt.github.io/cinoop.html
-*/
-//std::unordered_map<uint8_t, uint8_t> opcodeCycles = { };
+#include "sm83.h"
+#include "memory.h"
 
 
-//uint8_t opcodeCycles[0x100]
-//{
-//	/////////////////////////////////////////////////////////////
-//	//*//  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   //x//
-//	/////////////////////////////////////////////////////////////
-//	/*0*/  1 ,3 ,2 ,2 ,1 ,1 ,2 ,1 ,5 ,2 ,2 ,2 ,1 ,1 ,2 ,1 , /*0*/
-//	/*1*/  1 ,3 ,2 ,2 ,1 ,1 ,2 ,1 ,3 ,2 ,2 ,2 ,1 ,1 ,2 ,1 , /*1*/
-//	/*2*/  2 ,3 ,2 ,2 ,1 ,1 ,2 ,1 ,2 ,2 ,2 ,2 ,1 ,1 ,2 ,1 , /*2*/
-//	/*3*/  2 ,3 ,2 ,2 ,3 ,3 ,3 ,1 ,2 ,2 ,2 ,2 ,1 ,1 ,2 ,1 , /*3*/
-//	/*4*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*4*/
-//	/*5*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*5*/
-//	/*6*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*6*/
-//	/*7*/  2 ,2 ,2 ,2 ,2 ,2 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*7*/
-//	/*8*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*8*/
-//	/*9*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*9*/
-//	/*A*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*A*/
-//	/*B*/  1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 ,1 ,1 ,1 ,1 ,1 ,1 ,2 ,1 , /*B*/
-//	/*C*/  2 ,3 ,3 ,4 ,3 ,4 ,2 ,4 ,2 ,4 ,3 ,1 ,3 ,6 ,2 ,4 , /*C*/
-//	/*D*/  2 ,3 ,3 ,0 ,3 ,4 ,2 ,4 ,2 ,4 ,3 ,0 ,3 ,0 ,2 ,4 , /*D*/
-//	/*E*/  3 ,3 ,2 ,0 ,0 ,4 ,2 ,4 ,4 ,1 ,4 ,0 ,0 ,0 ,2 ,4 , /*E*/
-//	/*F*/  3 ,3 ,2 ,1 ,0 ,4 ,2 ,4 ,3 ,2 ,4 ,1 ,0 ,0 ,2 ,4 , /*F*/
-//	/////////////////////////////////////////////////////////////
-//	//x//  0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F   //*//
-//	/////////////////////////////////////////////////////////////
-//};
-
-uint8_t opcodeCycles[0x100] = {
-	///////////////////////////////////////////////////////////////////////////
-	//*//  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F  //x//
-	///////////////////////////////////////////////////////////////////////////
-	/*0*/  4 ,12 , 8 , 8 , 4 , 4 , 8 , 4 ,20 , 8 , 8 , 8 , 4 , 4 , 8 , 4 ,
-	/*1*/  4 ,12 , 8 , 8 , 4 , 4 , 8 , 4 ,12 , 8 , 8 , 8 , 4 , 4 , 8 , 4 ,
-	/*2*/  8 ,12 , 8 , 8 , 4 , 4 , 8 , 4 , 8 , 8 , 8 , 8 , 4 , 4 , 8 , 4 ,
-	/*3*/  8 ,12 , 8 , 8 ,12 ,12 ,12 , 4 , 8 , 8 , 8 , 8 , 4 , 4 , 8 , 4 ,
-	/*4*/  4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 ,
-	/*5*/  4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 ,
-	/*6*/  4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 ,
-	/*7*/  8 , 8 , 8 , 8 , 8 , 8 , 4 , 8 , 4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 ,
-	/*8*/  4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 ,
-	/*9*/  4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 ,
-	/*A*/  4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 ,
-	/*B*/  4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 , 4 , 4 , 4 , 4 , 4 , 4 , 8 , 4 ,
-	/*C*/  8 ,12 ,12 ,16 ,12 ,16 , 8 ,16 , 8 ,16 ,12 , 4 ,12 ,24 , 8 ,16 ,
-	/*D*/  8 ,12 ,12 , 0 ,12 ,16 , 8 ,16 , 8 ,16 ,12 , 0 ,12 , 0 , 8 ,16 ,
-	/*E*/  12 ,12 , 8 , 0 , 0 ,16 , 8 ,16 ,16 , 4 ,16 , 0 , 0 , 0 , 8 ,16 ,
-	/*F*/  12 ,12 , 8 , 4 , 0 ,16 , 8 ,16 ,12 , 8 ,16 , 4 , 0 , 0 , 8 ,16
-	///////////////////////////////////////////////////////////////////////////
-	//x//  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F  //*//
-	///////////////////////////////////////////////////////////////////////////
-};
-
-uint8_t opcodeCyclesCB[0x100] = {
-	/////////////////////////////////////////////////////////////
-	//*//  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F  //x//
-	/////////////////////////////////////////////////////////////
-	/*0*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*1*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*2*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*3*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*4*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*5*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*6*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*7*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*8*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*9*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*A*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*B*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*C*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*D*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*E*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 ,
-	/*F*/   8 , 8 , 8 , 8 , 8 , 8 ,16 , 8 , 8 , 8 , 8 , 8 , 8 , 8 ,16 , 8
-	/////////////////////////////////////////////////////////////
-	//x//  0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F  //*//
-	/////////////////////////////////////////////////////////////
-};
-
-
-uint16_t SM83::readWord(uint16_t  addr)
+SM83::SM83(Memory* memory) : memory(memory)
 {
-	uint8_t lo = memory->read(addr);
-	addr++;
-	uint8_t hi = memory->read(addr);
-	return (hi << 8) | lo;
+	AF = 0x01B0;
+	BC = 0x0013;
+	DE = 0x00D8;
+	HL = 0x014D;
+	SP = 0xFFFE;
+	PC = 0x0100;
+	IME = false;
+	IME_nextCycle = false;
+	isHalted = false;
+	cycles = 0;
 }
 
+bool SM83::getZ() { return (F & 0x80) != 0; }
+bool SM83::getN() { return (F & 0x40) != 0; }
+bool SM83::getH() { return (F & 0x20) != 0; }
+bool SM83::getC() { return (F & 0x10) != 0; }
+void SM83::setZ(bool v) { F = v ? (F | 0x80) : (F & ~0x80); }
+void SM83::setN(bool v) { F = v ? (F | 0x40) : (F & ~0x40); }
+void SM83::setH(bool v) { F = v ? (F | 0x20) : (F & ~0x20); }
+void SM83::setC(bool v) { F = v ? (F | 0x10) : (F & ~0x10); }
 
-inline void SM83::addCycle()
+uint8_t SM83::read8() { return memory->read(PC++); }
+uint16_t SM83::read16() { uint8_t lo = read8(); uint8_t hi = read8(); return (hi << 8) | lo; }
+
+void SM83::push(uint16_t val) { SP -= 2; memory->write(SP, val & 0xFF); memory->write(SP + 1, val >> 8); }
+uint16_t SM83::pop() { uint16_t val = memory->read(SP) | (memory->read(SP + 1) << 8); SP += 2; return val; }
+
+int SM83::step()
 {
-	cycles +=4;
-}
-
-inline void SM83::addCycleNoMul(uint8_t cyclesAdded)
-{
-	cycles += (cyclesAdded * 4);
-}
-
-inline void SM83::addCycle(uint8_t cyclesAdded)
-{
-	cycles += (cyclesAdded*4) ;
-}
-
-
-//the following add an extra cycle if a term is met
-/*
-*
-* 20 , 28
-* 30 , 38
-* c0 , c2, c4, c8, cA , CC, 
-* d0 , d2, d4, d8, dA , dC, 
-* 
-*/
-
-void SM83::debugRegs()
-{
-	reg.A = 0x01;
-	reg.F = 0xB0;
-	reg.B = 0x00;
-	reg.C = 0x13;
-	reg.D = 0x00;
-	reg.E = 0xD8;
-	reg.H = 0x01;
-	reg.L = 0x4D;
-	reg.SP = 0xFFFE;
-	reg.PC = 0x0100; 
-}
-
-bool halted = false;
-
-SM83::SM83(Memory* memory) : memory(memory) {};
-
-inline void clearFlags() { //inline is replace the code directly during compile
-	reg.F = 0;
-}
-
-inline void setZeroFlag()
-{		//     znhc
-	reg.F |= 0b10000000;
-}
-inline void unsetZeroFlag()
-{
-	reg.F &= 0b01111111;
-}
-
-inline void setNegFlag()
-{		//     znhc
-	reg.F |= 0b01000000;
-}
-inline void unsetNegFlag()
-{
-	reg.F &= 0b10111111; 
-}
-
-inline void setHalfFlag()
-{		//     znhc
-	reg.F |= 0b00100000;
-}
-inline void unsetHalfFlag()
-{		//     znhc
-	reg.F &= 0b11011111;
-}
-
-inline void setCarryFlag()
-{		//     znhc
-	reg.F |= 0b00010000;
-}
-inline void unsetCarryFlag()
-{		//     znhc
-	reg.F &= 0b11101111;
-}
-
-inline bool isZeroFlag()
-{
-	return (reg.F >> 7) & 0b1;
-}
-inline bool isNegFlag()
-{
-	return (reg.F >> 6) & 0b1;
-}
-inline bool isHalfFlag()
-{
-	return (reg.F >> 5) & 0b1;
-}
-inline bool isCarryFlag()
-{
-	return (reg.F >> 4) & 0b1;
-}
-
-inline void clearZeroFlag()
-{
-	reg.F &= ~(1 << 7);
-}
-
-inline void clearNegFlag()
-{
-	reg.F &= ~(1 << 6);
-}
-
-inline void clearHalfFlag()
-{
-	reg.F &= ~(1 << 5);
-}
-
-inline void clearCarryFlag()
-{
-	reg.F &= ~(1 << 4);
-}
-
-void incByte(uint8_t& r8) //example 0x04
-{
-	bool prev = isCarryFlag(); 
-	uint8_t temp = r8 + 1;
-
-	clearFlags();
-	if (temp == 0) setZeroFlag();
-	if ((r8 & 0x0F) == 0x0F) setHalfFlag();
-	if (prev) setCarryFlag();
-
-	r8 = temp; 
-}
-
-void decByte(uint8_t& r8) //0x05
-{ 
-	bool prev = isCarryFlag();
-	uint8_t result = r8 - 1;
-
-	clearFlags();
-	if (result == 0) setZeroFlag();
-	if ((r8 & 0x0F) == 0x00) setHalfFlag();
-	if (prev) setCarryFlag();
-	setNegFlag();
-
-	r8 = result;
-}
-
-void addWordReg(uint16_t& r16a, uint16_t r16b) { // example 0x09 , {- 0 H C}
-
-	uint32_t result = (uint32_t)r16a + (uint32_t)r16b;
-
-
-	clearNegFlag();
-
-	if ((r16a & 0xFFF) + (r16b & 0xFFF) > 0xFFF) {
-		setHalfFlag(); 
-	}
-	else {
-		clearHalfFlag();
-	}
-
-	if (result > 0xFFFF) {
-		setCarryFlag(); 
-	}
-	else {
-		clearCarryFlag();
-	}
-
-	r16a = (uint16_t)result;
-}
-
-void addWordRegSigned(uint16_t& r16a, int8_t r8b) { //00HC
-	uint16_t temp = r16a;
-	r16a += r8b; 
-
-	clearZeroFlag();
-	clearNegFlag(); 
-	
-
-	if (((temp ^ r8b ^ r16a) & 0x10) != 0) {
-		setHalfFlag(); 
-	}
-	else {
-		unsetHalfFlag(); 
-	}
-
-	if (((temp ^ r8b ^ r16a) & 0x100) != 0) {
-		setCarryFlag(); 
-	}
-	else {
-		unsetCarryFlag();
-	}
-}
-
-void addByteReg(uint8_t& r8a , uint8_t r8b) //0x80 line , {Z0HC}
-{
-	clearFlags();
-	uint16_t r16= r8a + r8b;
-
-	if (r16 & 0xFF00) setCarryFlag();
-	if ((r8a & 0x0F) + (r8b & 0x0F) > 0x0F) setHalfFlag();
-	if ((uint8_t)r16 == 0) setZeroFlag();
-
-	r8a = (uint8_t)r16;
-}
-
-void addCarryByteReg(uint8_t& r8a, uint8_t r8b) //0x88 {Z0HC}
-{
-	uint8_t carry = isCarryFlag() ? 1 : 0;
-    clearFlags();
-    uint16_t r16 = r8a + r8b + carry;
-
-    if (r16 & 0xFF00) setCarryFlag(); 
-    if ((r8a & 0x0F) + (r8b & 0x0F) + carry > 0x0F) setHalfFlag();  
-    if ((uint8_t)r16 == 0) setZeroFlag(); 
-
-    r8a = (uint8_t)r16;
-}
-
-void subByteReg(uint8_t& r8a , uint8_t r8b)
-{
-	clearFlags();
-	setNegFlag(); 
-	if (r8a < r8b) setCarryFlag();
-	if ((r8a & 0x0F) < (r8b & 0x0F)) setHalfFlag();
-	r8a -= r8b;
-	if (r8a == 0) setZeroFlag(); 
-}
-
-void subCarryByteReg(uint8_t& r8a, uint8_t r8b)
-{
-	uint8_t carry = isCarryFlag() ? 1 : 0;
-	clearFlags();
-	setNegFlag();
-
-	uint16_t r16 = r8a - r8b - carry;
-
-	if (r8b + carry > r8a) setCarryFlag();
-	if ((r8a & 0x0F) < (r8b & 0x0F) + carry) setHalfFlag();
-	if ((uint8_t)r16 == 0) setZeroFlag();
-
-	r8a = (uint8_t)r16;
-}
-
-void andByteReg(uint8_t& r8a, uint8_t r8b) // XA0 {z010}
-{
-	clearFlags();
-	setHalfFlag();
-	r8a = r8a & r8b;
-	if (r8a == 0x0)setZeroFlag();
-}
-
-void xorByteReg(uint8_t& r8a, uint8_t r8b)
-{
-	clearFlags();
-	r8a ^= r8b;
-	if (r8a == 0x0)setZeroFlag();
-}
-
-void orByteReg(uint8_t& r8a, uint8_t r8b)
-{
-	clearFlags();
-	r8a = r8a | r8b;
-	if (r8a == 0x0)setZeroFlag();
-}
-
-void compareByteReg(uint8_t r8a, uint8_t r8b)//this discards the result {Z1HC}
-{//basically only cares about flags
-	clearFlags();
-
-	setNegFlag();
-
-	if (r8b > r8a)
+	if (isHalted)
 	{
-		setCarryFlag();
+		cycles = 4;
+		return cycles;
 	}
-	if (r8a == r8b)
+
+	if (IME_nextCycle)
 	{
-		setZeroFlag();
-	}
-	if ((r8a & 0x0F) < (r8b & 0x0F)) {
-		setHalfFlag();
-	}
-}
-
-void SM83::call(uint16_t jumpAddr)
-{
-	push(reg.PC);
-	reg.PC = jumpAddr;
-}
-void SM83::push(uint16_t pushData)
-{
-	reg.SP-=2;
-	memory->write(reg.SP, pushData & 0xFF);
-	memory->write(reg.SP + 1, pushData >> 8);
-}
-uint16_t SM83::popStack()
-{
-	uint16_t word = readWord(reg.SP);
-	reg.SP += 2;
-	return word;
-}
-
-void rlc(uint8_t& r8) { //TODO : look into how the carry should work here, i mgiht be wrong
-	bool temp = (r8 >> 7) & 0x1; 
-	r8 = (r8 << 1) | temp;
-
-	if (r8 == 0) setZeroFlag();  
-	else unsetZeroFlag();
-
-	unsetNegFlag();
-	unsetHalfFlag();
-
-	if (temp) setCarryFlag();    
-	else unsetCarryFlag();
-}
-
-void rl(uint8_t& r8) // rotate left, r8 dig 1 = prev carry flag
-{
-	uint8_t Cbit = (reg.F & 0b00010000) >> 4; // if carry is present set it otherwise dont
-	clearFlags();
-	reg.F = ((r8 & 0b10000000) >> 3); // grab most significant bit and position it at the carry flag
-	r8 = ((r8 << 1) | Cbit) & 0xFF;
-	if (r8 == 0) setZeroFlag();
-}
-
-void rrc(uint8_t& r8) {
-
-	uint8_t temp = r8 & 0b1;
-	r8 = (r8 >> 1) | (temp << 7);
-
-	unsetNegFlag();
-	unsetHalfFlag();
-	if (r8 == 0) setZeroFlag();
-	else unsetZeroFlag();
-
-	if (temp)setCarryFlag();
-	else unsetCarryFlag();
-}
-
-void rr(uint8_t& r8)
-{
-	uint8_t Cbit = (reg.F & 0b00010000) << 3;
-	clearFlags();
-	reg.F = ((r8 & 0b1) << 4);// grab most significant bit and position it at the carry flag
-	r8 = ((r8 >> 1) | Cbit) & 0xFF;
-	if (r8 == 0) setZeroFlag();
-}
-
-void sla(uint8_t& r8)
-{
-	clearFlags();
-	if ((r8 & 0b10000000) >> 7) setCarryFlag();
-	r8 = (r8 << 1)  & 0b11111110; //force last val into 0
-	if (r8 == 0) setZeroFlag();
-}
-
-void sra(uint8_t& r8) { 
-	bool carry = (r8 & 0x01);
-	r8 = (r8 >> 1) | (r8 & 0x80);
-
-	if (r8 == 0) {
-		setZeroFlag();
-	}
-	else {
-		unsetZeroFlag();
+		IME = true;
+		IME_nextCycle = false;
 	}
 
-	unsetNegFlag();
-	unsetHalfFlag();
-
-	if (carry) {
-		setCarryFlag();
-	}
-	else {
-		unsetCarryFlag();
-	}
+	uint8_t opcode = read8();
+	cycles = execute(opcode);
+	return cycles;
 }
 
-void swap(uint8_t& r8) 
+int SM83::execute(uint8_t opcode)
 {
-	clearFlags();
-	r8 = ((r8 >> 4) & 0x0F) | ((r8 & 0x0F) << 4);
-	if (r8 == 0) setZeroFlag();
-}
-
-void srl(uint8_t& r8)
-{
-	clearFlags();
-	if (r8 & 0b00000001) setCarryFlag();
-	r8 = (r8 >> 1) & 0b01111111;
-	if (r8 == 0) setZeroFlag();
-}
-
-void bit(uint8_t u3, uint8_t r8) // {Z01-}
-{
-	unsetNegFlag();
-	setHalfFlag();
-	if (r8 & (1 << u3)) // if u3 bit is set
+	switch (opcode)
 	{
-		unsetZeroFlag();
+	case 0x00: return 4; // NOP
+	case 0x01: BC = read16(); return 12;
+	case 0x02: memory->write(BC, A); return 8;
+	case 0x03: BC++; return 8;
+	case 0x04: B = inc8(B); return 4;
+	case 0x05: B = dec8(B); return 4;
+	case 0x06: B = read8(); return 8;
+	case 0x07: { uint8_t carry = (A & 0x80) >> 7; A = (A << 1) | carry; setZ(false); setN(false); setH(false); setC(carry); return 4; }
+	case 0x08: { uint16_t addr = read16(); memory->write(addr, SP & 0xFF); memory->write(addr + 1, SP >> 8); return 20; }
+	case 0x09: HL = add16(HL, BC); return 8;
+	case 0x0A: A = memory->read(BC); return 8;
+	case 0x0B: BC--; return 8;
+	case 0x0C: C = inc8(C); return 4;
+	case 0x0D: C = dec8(C); return 4;
+	case 0x0E: C = read8(); return 8;
+	case 0x0F: { uint8_t carry = A & 1; A = (A >> 1) | (carry << 7); setZ(false); setN(false); setH(false); setC(carry); return 4; }
+
+	case 0x10: read8(); return 4; // STOP
+	case 0x11: DE = read16(); return 12;
+	case 0x12: memory->write(DE, A); return 8;
+	case 0x13: DE++; return 8;
+	case 0x14: D = inc8(D); return 4;
+	case 0x15: D = dec8(D); return 4;
+	case 0x16: D = read8(); return 8;
+	case 0x17: { uint8_t carry = getC() ? 1 : 0; setC(A & 0x80); A = (A << 1) | carry; setZ(false); setN(false); setH(false); return 4; }
+	case 0x18: { int8_t offset = (int8_t)read8(); PC += offset; return 12; }
+	case 0x19: HL = add16(HL, DE); return 8;
+	case 0x1A: A = memory->read(DE); return 8;
+	case 0x1B: DE--; return 8;
+	case 0x1C: E = inc8(E); return 4;
+	case 0x1D: E = dec8(E); return 4;
+	case 0x1E: E = read8(); return 8;
+	case 0x1F: { uint8_t carry = getC() ? 1 : 0; setC(A & 1); A = (A >> 1) | (carry << 7); setZ(false); setN(false); setH(false); return 4; }
+
+	case 0x20: { int8_t offset = (int8_t)read8(); if (!getZ()) { PC += offset; return 12; } return 8; }
+	case 0x21: HL = read16(); return 12;
+	case 0x22: memory->write(HL++, A); return 8;
+	case 0x23: HL++; return 8;
+	case 0x24: H = inc8(H); return 4;
+	case 0x25: H = dec8(H); return 4;
+	case 0x26: H = read8(); return 8;
+	case 0x27: daa(); return 4;
+	case 0x28: { int8_t offset = (int8_t)read8(); if (getZ()) { PC += offset; return 12; } return 8; }
+	case 0x29: HL = add16(HL, HL); return 8;
+	case 0x2A: A = memory->read(HL++); return 8;
+	case 0x2B: HL--; return 8;
+	case 0x2C: L = inc8(L); return 4;
+	case 0x2D: L = dec8(L); return 4;
+	case 0x2E: L = read8(); return 8;
+	case 0x2F: A = ~A; setN(true); setH(true); return 4;
+
+	case 0x30: { int8_t offset = (int8_t)read8(); if (!getC()) { PC += offset; return 12; } return 8; }
+	case 0x31: SP = read16(); return 12;
+	case 0x32: memory->write(HL--, A); return 8;
+	case 0x33: SP++; return 8;
+	case 0x34: memory->write(HL, inc8(memory->read(HL))); return 12;
+	case 0x35: memory->write(HL, dec8(memory->read(HL))); return 12;
+	case 0x36: memory->write(HL, read8()); return 12;
+	case 0x37: setN(false); setH(false); setC(true); return 4;
+	case 0x38: { int8_t offset = (int8_t)read8(); if (getC()) { PC += offset; return 12; } return 8; }
+	case 0x39: HL = add16(HL, SP); return 8;
+	case 0x3A: A = memory->read(HL--); return 8;
+	case 0x3B: SP--; return 8;
+	case 0x3C: A = inc8(A); return 4;
+	case 0x3D: A = dec8(A); return 4;
+	case 0x3E: A = read8(); return 8;
+	case 0x3F: setN(false); setH(false); setC(!getC()); return 4;
+
+		// LD r,r instructions
+	case 0x40: B = B; return 4;
+	case 0x41: B = C; return 4;
+	case 0x42: B = D; return 4;
+	case 0x43: B = E; return 4;
+	case 0x44: B = H; return 4;
+	case 0x45: B = L; return 4;
+	case 0x46: B = memory->read(HL); return 8;
+	case 0x47: B = A; return 4;
+	case 0x48: C = B; return 4;
+	case 0x49: C = C; return 4;
+	case 0x4A: C = D; return 4;
+	case 0x4B: C = E; return 4;
+	case 0x4C: C = H; return 4;
+	case 0x4D: C = L; return 4;
+	case 0x4E: C = memory->read(HL); return 8;
+	case 0x4F: C = A; return 4;
+
+	case 0x50: D = B; return 4;
+	case 0x51: D = C; return 4;
+	case 0x52: D = D; return 4;
+	case 0x53: D = E; return 4;
+	case 0x54: D = H; return 4;
+	case 0x55: D = L; return 4;
+	case 0x56: D = memory->read(HL); return 8;
+	case 0x57: D = A; return 4;
+	case 0x58: E = B; return 4;
+	case 0x59: E = C; return 4;
+	case 0x5A: E = D; return 4;
+	case 0x5B: E = E; return 4;
+	case 0x5C: E = H; return 4;
+	case 0x5D: E = L; return 4;
+	case 0x5E: E = memory->read(HL); return 8;
+	case 0x5F: E = A; return 4;
+
+	case 0x60: H = B; return 4;
+	case 0x61: H = C; return 4;
+	case 0x62: H = D; return 4;
+	case 0x63: H = E; return 4;
+	case 0x64: H = H; return 4;
+	case 0x65: H = L; return 4;
+	case 0x66: H = memory->read(HL); return 8;
+	case 0x67: H = A; return 4;
+	case 0x68: L = B; return 4;
+	case 0x69: L = C; return 4;
+	case 0x6A: L = D; return 4;
+	case 0x6B: L = E; return 4;
+	case 0x6C: L = H; return 4;
+	case 0x6D: L = L; return 4;
+	case 0x6E: L = memory->read(HL); return 8;
+	case 0x6F: L = A; return 4;
+
+	case 0x70: memory->write(HL, B); return 8;
+	case 0x71: memory->write(HL, C); return 8;
+	case 0x72: memory->write(HL, D); return 8;
+	case 0x73: memory->write(HL, E); return 8;
+	case 0x74: memory->write(HL, H); return 8;
+	case 0x75: memory->write(HL, L); return 8;
+	case 0x76: { // HALT
+		uint8_t IF = memory->read(0xFF0F);
+		uint8_t IE = memory->read(0xFFFF);
+		if (!IME && (IF & IE & 0x1F))
+		{
+			isHalted = false;
+		}
+		else
+		{
+			isHalted = true;
+		}
+		return 4;
+	}
+	case 0x77: memory->write(HL, A); return 8;
+	case 0x78: A = B; return 4;
+	case 0x79: A = C; return 4;
+	case 0x7A: A = D; return 4;
+	case 0x7B: A = E; return 4;
+	case 0x7C: A = H; return 4;
+	case 0x7D: A = L; return 4;
+	case 0x7E: A = memory->read(HL); return 8;
+	case 0x7F: A = A; return 4;
+
+		// ALU operations
+	case 0x80: add8(B); return 4;
+	case 0x81: add8(C); return 4;
+	case 0x82: add8(D); return 4;
+	case 0x83: add8(E); return 4;
+	case 0x84: add8(H); return 4;
+	case 0x85: add8(L); return 4;
+	case 0x86: add8(memory->read(HL)); return 8;
+	case 0x87: add8(A); return 4;
+	case 0x88: adc8(B); return 4;
+	case 0x89: adc8(C); return 4;
+	case 0x8A: adc8(D); return 4;
+	case 0x8B: adc8(E); return 4;
+	case 0x8C: adc8(H); return 4;
+	case 0x8D: adc8(L); return 4;
+	case 0x8E: adc8(memory->read(HL)); return 8;
+	case 0x8F: adc8(A); return 4;
+
+	case 0x90: sub8(B); return 4;
+	case 0x91: sub8(C); return 4;
+	case 0x92: sub8(D); return 4;
+	case 0x93: sub8(E); return 4;
+	case 0x94: sub8(H); return 4;
+	case 0x95: sub8(L); return 4;
+	case 0x96: sub8(memory->read(HL)); return 8;
+	case 0x97: sub8(A); return 4;
+	case 0x98: sbc8(B); return 4;
+	case 0x99: sbc8(C); return 4;
+	case 0x9A: sbc8(D); return 4;
+	case 0x9B: sbc8(E); return 4;
+	case 0x9C: sbc8(H); return 4;
+	case 0x9D: sbc8(L); return 4;
+	case 0x9E: sbc8(memory->read(HL)); return 8;
+	case 0x9F: sbc8(A); return 4;
+
+	case 0xA0: and8(B); return 4;
+	case 0xA1: and8(C); return 4;
+	case 0xA2: and8(D); return 4;
+	case 0xA3: and8(E); return 4;
+	case 0xA4: and8(H); return 4;
+	case 0xA5: and8(L); return 4;
+	case 0xA6: and8(memory->read(HL)); return 8;
+	case 0xA7: and8(A); return 4;
+	case 0xA8: xor8(B); return 4;
+	case 0xA9: xor8(C); return 4;
+	case 0xAA: xor8(D); return 4;
+	case 0xAB: xor8(E); return 4;
+	case 0xAC: xor8(H); return 4;
+	case 0xAD: xor8(L); return 4;
+	case 0xAE: xor8(memory->read(HL)); return 8;
+	case 0xAF: xor8(A); return 4;
+
+	case 0xB0: or8(B); return 4;
+	case 0xB1: or8(C); return 4;
+	case 0xB2: or8(D); return 4;
+	case 0xB3: or8(E); return 4;
+	case 0xB4: or8(H); return 4;
+	case 0xB5: or8(L); return 4;
+	case 0xB6: or8(memory->read(HL)); return 8;
+	case 0xB7: or8(A); return 4;
+	case 0xB8: cp8(B); return 4;
+	case 0xB9: cp8(C); return 4;
+	case 0xBA: cp8(D); return 4;
+	case 0xBB: cp8(E); return 4;
+	case 0xBC: cp8(H); return 4;
+	case 0xBD: cp8(L); return 4;
+	case 0xBE: cp8(memory->read(HL)); return 8;
+	case 0xBF: cp8(A); return 4;
+
+	case 0xC0: if (!getZ()) { PC = pop(); return 20; } return 8;
+	case 0xC1: BC = pop(); return 12;
+	case 0xC2: { uint16_t addr = read16(); if (!getZ()) { PC = addr; return 16; } return 12; }
+	case 0xC3: PC = read16(); return 16;
+	case 0xC4: { uint16_t addr = read16(); if (!getZ()) { push(PC); PC = addr; return 24; } return 12; }
+	case 0xC5: push(BC); return 16;
+	case 0xC6: add8(read8()); return 8;
+	case 0xC7: push(PC); PC = 0x00; return 16;
+	case 0xC8: if (getZ()) { PC = pop(); return 20; } return 8;
+	case 0xC9: PC = pop(); return 16;
+	case 0xCA: { uint16_t addr = read16(); if (getZ()) { PC = addr; return 16; } return 12; }
+	case 0xCB: return executeCB();
+	case 0xCC: { uint16_t addr = read16(); if (getZ()) { push(PC); PC = addr; return 24; } return 12; }
+	case 0xCD: { uint16_t addr = read16(); push(PC); PC = addr; return 24; }
+	case 0xCE: adc8(read8()); return 8;
+	case 0xCF: push(PC); PC = 0x08; return 16;
+
+	case 0xD0: if (!getC()) { PC = pop(); return 20; } return 8;
+	case 0xD1: DE = pop(); return 12;
+	case 0xD2: { uint16_t addr = read16(); if (!getC()) { PC = addr; return 16; } return 12; }
+	case 0xD4: { uint16_t addr = read16(); if (!getC()) { push(PC); PC = addr; return 24; } return 12; }
+	case 0xD5: push(DE); return 16;
+	case 0xD6: sub8(read8()); return 8;
+	case 0xD7: push(PC); PC = 0x10; return 16;
+	case 0xD8: if (getC()) { PC = pop(); return 20; } return 8;
+	case 0xD9: PC = pop(); IME = true; return 16;
+	case 0xDA: { uint16_t addr = read16(); if (getC()) { PC = addr; return 16; } return 12; }
+	case 0xDC: { uint16_t addr = read16(); if (getC()) { push(PC); PC = addr; return 24; } return 12; }
+	case 0xDE: sbc8(read8()); return 8;
+	case 0xDF: push(PC); PC = 0x18; return 16;
+
+	case 0xE0: memory->write(0xFF00 + read8(), A); return 12;
+	case 0xE1: HL = pop(); return 12;
+	case 0xE2: memory->write(0xFF00 + C, A); return 8;
+	case 0xE5: push(HL); return 16;
+	case 0xE6: and8(read8()); return 8;
+	case 0xE7: push(PC); PC = 0x20; return 16;
+	case 0xE8: SP = addSP(); return 16;
+	case 0xE9: PC = HL; return 4;
+	case 0xEA: memory->write(read16(), A); return 16;
+	case 0xEE: xor8(read8()); return 8;
+	case 0xEF: push(PC); PC = 0x28; return 16;
+
+	case 0xF0: A = memory->read(0xFF00 + read8()); return 12;
+	case 0xF1: AF = pop() & 0xFFF0; return 12;
+	case 0xF2: A = memory->read(0xFF00 + C); return 8;
+	case 0xF3: IME = false; IME_nextCycle = false; return 4;
+	case 0xF5: push(AF); return 16;
+	case 0xF6: or8(read8()); return 8;
+	case 0xF7: push(PC); PC = 0x30; return 16;
+	case 0xF8: HL = addSP(); return 12;
+	case 0xF9: SP = HL; return 8;
+	case 0xFA: A = memory->read(read16()); return 16;
+	case 0xFB: IME_nextCycle = true; return 4;
+	case 0xFE: cp8(read8()); return 8;
+	case 0xFF: push(PC); PC = 0x38; return 16;
+
+	default: return 4;
+	}
+}
+
+int SM83::executeCB()
+{
+	uint8_t opcode = read8();
+	uint8_t regIdx = opcode & 7;
+	uint8_t bit = (opcode >> 3) & 7;
+
+	auto getReg = [&]() -> uint8_t
+		{
+			switch (regIdx)
+			{
+			case 0: return B;
+			case 1: return C;
+			case 2: return D;
+			case 3: return E;
+			case 4: return H;
+			case 5: return L;
+			case 6: return memory->read(HL);
+			case 7: return A;
+			}
+			return 0;
+		};
+
+	auto setReg = [&](uint8_t val)
+		{
+			switch (regIdx)
+			{
+			case 0: B = val; break;
+			case 1: C = val; break;
+			case 2: D = val; break;
+			case 3: E = val; break;
+			case 4: H = val; break;
+			case 5: L = val; break;
+			case 6: memory->write(HL, val); break;
+			case 7: A = val; break;
+			}
+		};
+
+	if (opcode < 0x40)
+	{
+		uint8_t val = getReg();
+		uint8_t result = val;
+
+		switch ((opcode >> 3) & 7)
+		{
+		case 0: {
+			uint8_t carry = (val & 0x80) >> 7;
+			result = (val << 1) | carry;
+			setC(carry);
+			break;
+		}
+		case 1: {
+			uint8_t carry = val & 1;
+			result = (val >> 1) | (carry << 7);
+			setC(carry);
+			break;
+		}
+		case 2: {
+			uint8_t carry = getC() ? 1 : 0;
+			result = (val << 1) | carry;
+			setC(val & 0x80);
+			break;
+		}
+		case 3: {
+			uint8_t carry = getC() ? 1 : 0;
+			result = (val >> 1) | (carry << 7);
+			setC(val & 1);
+			break;
+		}
+		case 4: {
+			result = val << 1;
+			setC(val & 0x80);
+			break;
+		}
+		case 5: {
+			result = (val >> 1) | (val & 0x80);
+			setC(val & 1);
+			break;
+		}
+		case 6: {
+			result = ((val & 0x0F) << 4) | ((val & 0xF0) >> 4);
+			setC(false);
+			break;
+		}
+		case 7: {
+			result = val >> 1;
+			setC(val & 1);
+			break;
+		}
+		}
+
+		setZ(result == 0);
+		setN(false);
+		setH(false);
+		setReg(result);
+		return regIdx == 6 ? 16 : 8;
+	}
+	else if (opcode < 0x80)
+	{
+		// BIT
+		uint8_t val = getReg();
+		setZ((val & (1 << bit)) == 0);
+		setN(false);
+		setH(true);
+		return regIdx == 6 ? 12 : 8;
+	}
+	else if (opcode < 0xC0)
+	{
+		// RES
+		uint8_t val = getReg();
+		val &= ~(1 << bit);
+		setReg(val);
+		return regIdx == 6 ? 16 : 8;
 	}
 	else
 	{
-		setZeroFlag();
+		// SET
+		uint8_t val = getReg();
+		val |= (1 << bit);
+		setReg(val);
+		return regIdx == 6 ? 16 : 8;
 	}
 }
 
-inline void res(uint8_t u3, uint8_t& r8)
+uint8_t SM83::inc8(uint8_t val)
 {
-	r8 &= ~(1 << u3);
+	setH((val & 0x0F) == 0x0F);
+	val++;
+	setZ(val == 0);
+	setN(false);
+	return val;
 }
 
-inline void set(uint8_t u3, uint8_t& r8)
+uint8_t SM83::dec8(uint8_t val)
 {
-	r8 |= (1 << u3);
+	setH((val & 0x0F) == 0);
+	val--;
+	setZ(val == 0);
+	setN(true);
+	return val;
 }
 
-void SM83::executePrefix(uint8_t opcode)
+void SM83::add8(uint8_t val)
 {
-	
-	addCycleNoMul(opcodeCyclesCB[opcode]);
-	switch (opcode) {
+	int result = A + val;
+	setH((A & 0x0F) + (val & 0x0F) > 0x0F);
+	setC(result > 0xFF);
+	A = result & 0xFF;
+	setZ(A == 0);
+	setN(false);
+}
 
-	case 0x00: {
-		rlc(reg.B);
-	} break;
-	case 0x01: {
-		rlc(reg.C);
-	} break;
-	case 0x02: {
-		rlc(reg.D);
-	} break;
-	case 0x03: {
-		rlc(reg.E);
-	} break;
-	case 0x04: {
-		rlc(reg.H);
-	} break;
-	case 0x05: {
-		rlc(reg.L);
-	} break;
-	case 0x06: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		rlc(a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x07: {
-		rlc(reg.A);
-	} break;
-	case 0x08: {
-		rrc(reg.B);
-	} break;
-	case 0x09: {
-		rrc(reg.C);
-	} break;
-	case 0x0A: {
-		rrc(reg.D);
-	} break;
-	case 0x0B: {
-		rrc(reg.E);
-	} break;
-	case 0x0C: {
-		rrc(reg.H);
-	} break;
-	case 0x0D: {
-		rrc(reg.L);
-	} break;
-	case 0x0E: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		rrc(a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x0F: {
-		rrc(reg.A);
-	} break;
-	//line 1 ===RL RR================================================
-	case 0x10: {
-		rl(reg.B);
-	} break;
-	case 0x11: {
-		rl(reg.C);
-	} break;
-	case 0x12: {
-		rl(reg.D);
-	} break;
-	case 0x13: {
-		rl(reg.E);
-	} break;
-	case 0x14: {
-		rl(reg.H);
-	} break;
-	case 0x15: {
-		rl(reg.L);
-	} break;
-	case 0x16: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		rl(a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x17: {
-		rl(reg.A);
-	} break;
-	case 0x18: {
-		rr(reg.B);
-	} break;
-	case 0x19: {
-		rr(reg.C);
-	} break;
-	case 0x1A: {
-		rr(reg.D);
-	} break;
-	case 0x1B: {
-		rr(reg.E);
-	} break;
-	case 0x1C: {
-		rr(reg.H);
-	} break;
-	case 0x1D: {
-		rr(reg.L);
-	} break;
-	case 0x1E: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		rr(a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x1F: {
-		rr(reg.A);
-	} break;
-//line 2 ===SLA SRA================================================
-	
-	case 0x20: {
-		sla(reg.B);
-	} break;
-	case 0x21: {
-		sla(reg.C);
-	} break;
-	case 0x22: {
-		sla(reg.D);
-	} break;
-	case 0x23: {
-		sla(reg.E);
-	} break;
-	case 0x24: {
-		sla(reg.H);
-	} break;
-	case 0x25: {
-		sla(reg.L);
-	} break;
-	case 0x26: {// whatever hl is pointing to 
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		sla(a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x27: {
-		sla(reg.A);
-	} break;
-	case 0x28: {
-		sra(reg.B);
-	} break;
-	case 0x29: {
-		sra(reg.C);
-	} break;
-	case 0x2A: {
-		sra(reg.D);
-	} break;
-	case 0x2B: {
-		sra(reg.E);
-	} break;
-	case 0x2C: {
-		sra(reg.H);
-	} break;
-	case 0x2D: {
-		sra(reg.L);
-	} break;
-	case 0x2E: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		sra(a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x2F: {
-		sra(reg.A);
-	} break;
-//line 3 ===SWAP SRL================================================
+void SM83::adc8(uint8_t val)
+{
+	int carry = getC() ? 1 : 0;
+	int result = A + val + carry;
+	setH((A & 0x0F) + (val & 0x0F) + carry > 0x0F);
+	setC(result > 0xFF);
+	A = result & 0xFF;
+	setZ(A == 0);
+	setN(false);
+}
 
-	case 0x30: {
-		swap(reg.B);
-	} break;
-	case 0x31: {
-		swap(reg.C);
-	} break;
-	case 0x32: {
-		swap(reg.D);
-	} break;
-	case 0x33: {
-		swap(reg.E);
-	} break;
-	case 0x34: {
-		swap(reg.H);
-	} break;
-	case 0x35: {
-		swap(reg.L);
-	} break;
-	case 0x36: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		swap(a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x37: {
-		swap(reg.A);
-	} break;
-	case 0x38: {
-		srl(reg.B);
-	} break;
-	case 0x39: {
-		srl(reg.C);
-	} break;
-	case 0x3A: {
-		srl(reg.D);
-	} break;
-	case 0x3B: {
-		srl(reg.E);
-	} break;
-	case 0x3C: {
-		srl(reg.H);
-	} break;
-	case 0x3D: {
-		srl(reg.L);
-	} break;
-	case 0x3E: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		srl(a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x3F: {
-		srl(reg.A);
-	} break;
-//	line 4 bit (0x6, 0xe should be 1 not 2) =======================
-	
-	case 0x40: {
-		bit(0,reg.B);
-	} break;
-	case 0x41: {
-		bit(0, reg.C);
-	} break;
-	case 0x42: {
-		bit(0, reg.D);
-	} break;
-	case 0x43: {
-		bit(0, reg.E);
-	} break;
-	case 0x44: {
-		bit(0, reg.H);
-	} break;
-	case 0x45: {
-		bit(0, reg.L);
-	} break;
-	case 0x46: {// whatever hl is pointing to
-		addCycle();
-		uint8_t a8 = memory->read(reg.HL);
-		bit(0, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x47: {
-		bit(0, reg.A);
-	} break;
-	case 0x48: {
-		bit(1, reg.B);
-	} break;
-	case 0x49: {
-		bit(1, reg.C);
-	} break;
-	case 0x4A: {
-		bit(1, reg.D);
-	} break;
-	case 0x4B: {
-		bit(1, reg.E);
-	} break;
-	case 0x4C: {
-		bit(1, reg.H);
-	} break;
-	case 0x4D: {
-		bit(1, reg.L);
-	} break;
-	case 0x4E: {// whatever hl is pointing to
-		addCycle();
-		uint8_t a8 = memory->read(reg.HL);
-		bit(1, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x4F: {
-		bit(1, reg.A);
-	} break;
-//	line 5 bit (0x6, 0xe should be 1 not 2) =======================
+void SM83::sub8(uint8_t val)
+{
+	setH((A & 0x0F) < (val & 0x0F));
+	setC(A < val);
+	A -= val;
+	setZ(A == 0);
+	setN(true);
+}
 
-	case 0x50: {
-		bit(2, reg.B);
-	} break;
-	case 0x51: {
-		bit(2, reg.C);
-	} break;
-	case 0x52: {
-		bit(2, reg.D);
-	} break;
-	case 0x53: {
-		bit(2, reg.E);
-	} break;
-	case 0x54: {
-		bit(2, reg.H);
-	} break;
-	case 0x55: {
-		bit(2, reg.L);
-	} break;
-	case 0x56: {// whatever hl is pointing to
-		addCycle();
-		uint8_t a8 = memory->read(reg.HL);
-		bit(2, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x57: {
-		bit(2, reg.A);
-	} break;
-	case 0x58: {
-		bit(3, reg.B);
-	} break;
-	case 0x59: {
-		bit(3, reg.C);
-	} break;
-	case 0x5A: {
-		bit(3, reg.D);
-	} break;
-	case 0x5B: {
-		bit(3, reg.E);
-	} break;
-	case 0x5C: {
-		bit(3, reg.H);
-	} break;
-	case 0x5D: {
-		bit(3, reg.L);
-	} break;
-	case 0x5E: {// whatever hl is pointing to
-		addCycle();
-		uint8_t a8 = memory->read(reg.HL);
-		bit(3, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x5F: {
-		bit(3, reg.A);
-	} break;
+void SM83::sbc8(uint8_t val)
+{
+	int carry = getC() ? 1 : 0;
+	int result = A - val - carry;
+	setH((A & 0x0F) < (val & 0x0F) + carry);
+	setC(result < 0);
+	A = result & 0xFF;
+	setZ(A == 0);
+	setN(true);
+}
 
-//	line 6 bit (0x6, 0xe should be 1 not 2) =======================
+void SM83::and8(uint8_t val)
+{
+	A &= val;
+	setZ(A == 0);
+	setN(false);
+	setH(true);
+	setC(false);
+}
 
-	case 0x60: {
-		bit(4, reg.B);
-	} break;
-	case 0x61: {
-		bit(4, reg.C);
-	} break;
-	case 0x62: {
-		bit(4, reg.D);
-	} break;
-	case 0x63: {
-		bit(4, reg.E);
-	} break;
-	case 0x64: {
-		bit(4, reg.H);
-	} break;
-	case 0x65: {
-		bit(4, reg.L);
-	} break;
-	case 0x66: {// whatever hl is pointing to
-		addCycle();
-		uint8_t a8 = memory->read(reg.HL);
-		bit(4, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x67: {
-		bit(4, reg.A);
-	} break;
-	case 0x68: {
-		bit(5, reg.B);
-	} break;
-	case 0x69: {
-		bit(5, reg.C);
-	} break;
-	case 0x6A: {
-		bit(5, reg.D);
-	} break;
-	case 0x6B: {
-		bit(5, reg.E);
-	} break;
-	case 0x6C: {
-		bit(5, reg.H);
-	} break;
-	case 0x6D: {
-		bit(5, reg.L);
-	} break;
-	case 0x6E: {// whatever hl is pointing to
-		addCycle();
-		uint8_t a8 = memory->read(reg.HL);
-		bit(5, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x6F: {
-		bit(5, reg.A);
-	} break;
+void SM83::xor8(uint8_t val)
+{
+	A ^= val;
+	setZ(A == 0);
+	setN(false);
+	setH(false);
+	setC(false);
+}
 
-//	line 7 bit (0x6, 0xe should be 1 not 2) =======================
+void SM83::or8(uint8_t val)
+{
+	A |= val;
+	setZ(A == 0);
+	setN(false);
+	setH(false);
+	setC(false);
+}
 
-	case 0x70: {
-		bit(6, reg.B);
-	} break;
-	case 0x71: {
-		bit(6, reg.C);
-	} break;
-	case 0x72: {
-		bit(6, reg.D);
-	} break;
-	case 0x73: {
-		bit(6, reg.E);
-	} break;
-	case 0x74: {
-		bit(6, reg.H);
-	} break;
-	case 0x75: {
-		bit(6, reg.L);
-	} break;
-	case 0x76: {// whatever hl is pointing to
-		addCycle();
-		uint8_t a8 = memory->read(reg.HL);
-		bit(6, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x77: {
-		bit(6, reg.A);
-	} break;
-	case 0x78: {
-		bit(7, reg.B);
-	} break;
-	case 0x79: {
-		bit(7, reg.C);
-	} break;
-	case 0x7A: {
-		bit(7, reg.D);
-	} break;
-	case 0x7B: {
-		bit(7, reg.E);
-	} break;
-	case 0x7C: {
-		bit(7, reg.H);
-	} break;
-	case 0x7D: {
-		bit(7, reg.L);
-	} break;
-	case 0x7E: {// whatever hl is pointing to
-		addCycle();
-		uint8_t a8 = memory->read(reg.HL);
-		bit(7, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x7F: {
-		bit(7, reg.A);
-	} break;
+void SM83::cp8(uint8_t val)
+{
+	setH((A & 0x0F) < (val & 0x0F));
+	setC(A < val);
+	setZ(A == val);
+	setN(true);
+}
 
-//	line 8 bit (0x6, 0xe should be 2 not 1) =======================
+void SM83::daa()
+{
+	uint8_t correction = 0;
+	bool setCarry = false;
 
-	case 0x80: {
-		res(0, reg.B);
-	} break;
-	case 0x81: {
-		res(0, reg.C);
-	} break;
-	case 0x82: {
-		res(0, reg.D);
-	} break;
-	case 0x83: {
-		res(0, reg.E);
-	} break;
-	case 0x84: {
-		res(0, reg.H);
-	} break;
-	case 0x85: {
-		res(0, reg.L);
-	} break;
-	case 0x86: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		res(0, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x87: {
-		res(0, reg.A);
-	} break;
-	case 0x88: {
-		res(1, reg.B);
-	} break;
-	case 0x89: {
-		res(1, reg.C);
-	} break;
-	case 0x8A: {
-		res(1, reg.D);
-	} break;
-	case 0x8B: {
-		res(1, reg.E);
-	} break;
-	case 0x8C: {
-		res(1, reg.H);
-	} break;
-	case 0x8D: {
-		res(1, reg.L);
-	} break;
-	case 0x8E: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		res(1, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x8F: {
-		res(1, reg.A);
-	} break;
-
-//	line 9 bit (0x6, 0xe should be 2 not 1) =======================
-
-	case 0x90: {
-		res(2, reg.B);
-	} break;
-	case 0x91: {
-		res(2, reg.C);
-	} break;
-	case 0x92: {
-		res(2, reg.D);
-	} break;
-	case 0x93: {
-		res(2, reg.E);
-	} break;
-	case 0x94: {
-		res(2, reg.H);
-	} break;
-	case 0x95: {
-		res(2, reg.L);
-	} break;
-	case 0x96: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		res(2, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x97: {
-		res(2, reg.A);
-	} break;
-	case 0x98: {
-		res(3, reg.B);
-	} break;
-	case 0x99: {
-		res(3, reg.C);
-	} break;
-	case 0x9A: {
-		res(3, reg.D);
-	} break;
-	case 0x9B: {
-		res(3, reg.E);
-	} break;
-	case 0x9C: {
-		res(3, reg.H);
-	} break;
-	case 0x9D: {
-		res(3, reg.L);
-	} break;
-	case 0x9E: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		res(3, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0x9F: {
-		res(3, reg.A);
-	} break;
-//	line A bit (0x6, 0xe should be 2 not 1) =======================
-
-	case 0xA0: {
-		res(4, reg.B);
-	} break;
-	case 0xA1: {
-		res(4, reg.C);
-	} break;
-	case 0xA2: {
-		res(4, reg.D);
-	} break;
-	case 0xA3: {
-		res(4, reg.E);
-	} break;
-	case 0xA4: {
-		res(4, reg.H);
-	} break;
-	case 0xA5: {
-		res(4, reg.L);
-	} break;
-	case 0xA6: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		res(4, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xA7: {
-		res(4, reg.A);
-	} break;
-	case 0xA8: {
-		res(5, reg.B);
-	} break;
-	case 0xA9: {
-		res(5, reg.C);
-	} break;
-	case 0xAA: {
-		res(5, reg.D);
-	} break;
-	case 0xAB: {
-		res(5, reg.E);
-	} break;
-	case 0xAC: {
-		res(5, reg.H);
-	} break;
-	case 0xAD: {
-		res(5, reg.L);
-	} break;
-	case 0xAE: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		res(5, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xAF: {
-		res(5, reg.A);
-	} break;
-
-//	line b bit (0x6, 0xe should be 2 not 1) =======================
-
-	case 0xB0: {
-		res(6, reg.B);
-	} break;
-	case 0xB1: {
-		res(6, reg.C);
-	} break;
-	case 0xB2: {
-		res(6, reg.D);
-	} break;
-	case 0xB3: {
-		res(6, reg.E);
-	} break;
-	case 0xB4: {
-		res(6, reg.H);
-	} break;
-	case 0xB5: {
-		res(6, reg.L);
-	} break;
-	case 0xB6: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		res(6, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xB7: {
-		res(6, reg.A);
-	} break;
-	case 0xB8: {
-		res(7, reg.B);
-	} break;
-	case 0xB9: {
-		res(7, reg.C);
-	} break;
-	case 0xBA: {
-		res(7, reg.D);
-	} break;
-	case 0xBB: {
-		res(7, reg.E);
-	} break;
-	case 0xBC: {
-		res(7, reg.H);
-	} break;
-	case 0xBD: {
-		res(7, reg.L);
-	} break;
-	case 0xBE: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		res(7, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xBF: {
-		res(7, reg.A);
-	} break;
-
-//	line c bit (0x6, 0xe should be 2 not 1) =======================
-
-	case 0xC0: {
-		set(0, reg.B);
-	} break;
-	case 0xC1: {
-		set(0, reg.C);
-	} break;
-	case 0xC2: {
-		set(0, reg.D);
-	} break;
-	case 0xC3: {
-		set(0, reg.E);
-	} break;
-	case 0xC4: {
-		set(0, reg.H);
-	} break;
-	case 0xC5: {
-		set(0, reg.L);
-	} break;
-	case 0xC6: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		set(0, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xC7: {
-		set(0, reg.A);
-	} break;
-	case 0xC8: {
-		set(1, reg.B);
-	} break;
-	case 0xC9: {
-		set(1, reg.C);
-	} break;
-	case 0xCA: {
-		set(1, reg.D);
-	} break;
-	case 0xCB: {
-		set(1, reg.E);
-	} break;
-	case 0xCC: {
-		set(1, reg.H);
-	} break;
-	case 0xCD: {
-		set(1, reg.L);
-	} break;
-	case 0xCE: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		set(1, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xCF: {
-		set(1, reg.A);
-	} break;
-
-//	line D bit (0x6, 0xe should be 2 not 1) =======================
-
-	case 0xD0: {
-		set(2, reg.B);
-	} break;
-	case 0xD1: {
-		set(2, reg.C);
-	} break;
-	case 0xD2: {
-		set(2, reg.D);
-	} break;
-	case 0xD3: {
-		set(2, reg.E);
-	} break;
-	case 0xD4: {
-		set(2, reg.H);
-	} break;
-	case 0xD5: {
-		set(2, reg.L);
-	} break;
-	case 0xD6: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		set(2, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xD7: {
-		set(2, reg.A);
-	} break;
-	case 0xD8: {
-		set(3, reg.B);
-	} break;
-	case 0xD9: {
-		set(3, reg.C);
-	} break;
-	case 0xDA: {
-		set(3, reg.D);
-	} break;
-	case 0xDB: {
-		set(3, reg.E);
-	} break;
-	case 0xDC: {
-		set(3, reg.H);
-	} break;
-	case 0xDD: {
-		set(3, reg.L);
-	} break;
-	case 0xDE: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		set(3, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xDF: {
-		set(3, reg.A);
-	} break;
-
-//	line E bit (0x6, 0xe should be 2 not 1) =======================
-
-	case 0xE0: {
-		set(4, reg.B);
-	} break;
-	case 0xE1: {
-		set(4, reg.C);
-	} break;
-	case 0xE2: {
-		set(4, reg.D);
-	} break;
-	case 0xE3: {
-		set(4, reg.E);
-	} break;
-	case 0xE4: {
-		set(4, reg.H);
-	} break;
-	case 0xE5: {
-		set(4, reg.L);
-	} break;
-	case 0xE6: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		set(4, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xE7: {
-		set(4, reg.A);
-	} break;
-	case 0xE8: {
-		set(5, reg.B);
-	} break;
-	case 0xE9: {
-		set(5, reg.C);
-	} break;
-	case 0xEA: {
-		set(5, reg.D);
-	} break;
-	case 0xEB: {
-		set(5, reg.E);
-	} break;
-	case 0xEC: {
-		set(5, reg.H);
-	} break;
-	case 0xED: {
-		set(5, reg.L);
-	} break;
-	case 0xEE: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		set(5, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xEF: {
-		set(5, reg.A);
-	} break;
-
-//	line F bit (0x6, 0xe should be 2 not 1) =======================
-
-	case 0xF0: {
-		set(6, reg.B);
-	} break;
-	case 0xF1: {
-		set(6, reg.C);
-	} break;
-	case 0xF2: {
-		set(6, reg.D);
-	} break;
-	case 0xF3: {
-		set(6, reg.E);
-	} break;
-	case 0xF4: {
-		set(6, reg.H);
-	} break;
-	case 0xF5: {
-		set(6, reg.L);
-	} break;
-	case 0xF6: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		set(6, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xF7: {
-		set(6, reg.A);
-	} break;
-	case 0xF8: {
-		set(7, reg.B);
-	} break;
-	case 0xF9: {
-		set(7, reg.C);
-	} break;
-	case 0xFA: {
-		set(7, reg.D);
-	} break;
-	case 0xFB: {
-		set(7, reg.E);
-	} break;
-	case 0xFC: {
-		set(7, reg.H);
-	} break;
-	case 0xFD: {
-		set(7, reg.L);
-	} break;
-	case 0xFE: {// whatever hl is pointing to
-		addCycle(2);
-		uint8_t a8 = memory->read(reg.HL);
-		set(7, a8);
-		memory->write(reg.HL, a8);
-	} break;
-	case 0xFF: {
-		set(7, reg.A);
-	} break;
-
-
-	default: {
-
-	} break;
-
-
+	if (getH() || (!getN() && (A & 0x0F) > 0x09))
+	{
+		correction |= 0x06;
 	}
-}
 
-void SM83::execute(uint8_t opcode)
-{
-
-
-	switch (opcode) {
-
-	case 0x00: { // no op
-
-	}break;
-	case 0x01: { // load into bc, n16
-		reg.BC = readWord(reg.PC); reg.PC+=2;
-	}break;
-	case 0x02: { // write into address BC, A
-		memory->write(reg.BC, reg.A);
-	}break;
-	case 0x03: {
-		reg.BC++;
-	}break;
-	case 0x04: {
-		incByte(reg.B);
-	}break;
-	case 0x05: {
-		decByte(reg.B);
-	}break;
-	case 0x06: {
-		reg.B = memory->read(reg.PC); reg.PC++;
-		//reg.PC++;
-	}break;
-	case 0x07: { // rotate register A left 
-		rlc(reg.A);
-		unsetZeroFlag();
-		unsetNegFlag();
-		unsetHalfFlag();
-	}break;
-	case 0x08: { // load [a16] , SP
-		uint16_t wordAdr = readWord(reg.PC); reg.PC+=2;
-		memory->write(wordAdr, (reg.SP) & 0xFF);
-		memory->write(wordAdr+1, (reg.SP>>8) & 0xFF);
-	}break;
-	case 0x09: {
-		addWordReg(reg.HL, reg.BC);
-	}break;
-	case 0x0A: {// load into A, [bc]
-		reg.A = memory->read(reg.BC);
-	}break;
-	case 0x0B: {
-		reg.BC--;
-	}break;
-	case 0x0C: {
-		incByte(reg.C);
-	}break;
-	case 0x0D: {
-		decByte(reg.C);
-	}break;
-	case 0x0E: {
-		reg.C = memory->read(reg.PC); reg.PC++;
-	}break;
-	case 0x0F: {   //0b00000001
-		rrc(reg.A);
-		unsetZeroFlag();
-		unsetNegFlag();
-		unsetHalfFlag();
-	}break;
-
-	//====0x1?===================================================
-
-	case 0x10: { // STOP, this is a funny one TODO: look into this in pandocs
-		//i think we take in another byte ?
-		//make it so as long as stop mode is on, div timer cant increment and is reset to 0
-		memory->write(0xFF04, 0);
-
-		memory->read(reg.PC); reg.PC++;
-
-	}break;
-	case 0x11: { // load into bc, n16
-		reg.DE = readWord(reg.PC); reg.PC+=2;
-	}break;
-	case 0x12: { // write into address BC, A
-		memory->write(reg.DE, reg.A);
-	}break;
-	case 0x13: {
-		reg.DE++;
-	}break;
-	case 0x14: {
-		incByte(reg.D);
-	}break;
-	case 0x15: {
-		decByte(reg.D);
-	}break;
-	case 0x16: {
-		reg.D = memory->read(reg.PC); reg.PC++;
-	}break;
-	case 0x17: { // rotate register A left ,carry goes into a
-		rl(reg.A);
-		unsetZeroFlag();
-		unsetNegFlag();
-		unsetHalfFlag();
-	}break;
-	case 0x18: { // jump to e8
-
-		int8_t offset = (int8_t)memory->read(reg.PC); reg.PC++; // pc = 129
-		reg.PC += offset;
-
-	}break;
-	case 0x19: {
-		addWordReg(reg.HL, reg.DE);
-	}break;
-	case 0x1A: {
-		reg.A = memory->read(reg.DE);
-	}break;
-	case 0x1B: {
-		reg.DE--;
-	}break;
-	case 0x1C: {
-		incByte(reg.E);
-	}break;
-	case 0x1D: {
-		decByte(reg.E);
-	}break;
-	case 0x1E: {
-		reg.E = memory->read(reg.PC) ; reg.PC++;
-	}break;
-	case 0x1F: {   //RRA //0bznhc0000
-		rr(reg.A);
-		unsetZeroFlag();
-		unsetNegFlag();
-		unsetHalfFlag();
-	}break;
-
-	//====0x2?===================================================
-
-	case 0x20: { // JR NZ , e8
-		// jump to e8 if NotZ is met
-		int8_t offset = (int8_t)memory->read(reg.PC);
-		reg.PC++; // pc = 129
-		if (!isZeroFlag())
-		{
-			addCycle();
-			reg.PC += offset;
-		}
-	}break;
-	case 0x21: { // load into bc, n16
-		reg.HL = readWord(reg.PC); reg.PC+=2;
-	}break;
-	case 0x22: { // write into address BC, A
-		memory->write(reg.HL, reg.A);
-		reg.HL++;
-	}break;
-	case 0x23: {
-		reg.HL++;
-	}break;
-	case 0x24: {
-		incByte(reg.H);
-	}break;
-	case 0x25: {
-		decByte(reg.H);
-	}break;
-	case 0x26: { //THIS ONE IS APPARENTLY BREAKING THE SYSTEM ACCORDING TO GAMEBOYDOCTOR
-		reg.H = memory->read(reg.PC); 
-		reg.PC++;
-	}break;
-	case 0x27: { 
-		uint8_t a = reg.A;
-		bool c = isCarryFlag();
-		bool h = isHalfFlag();
-		bool n = isNegFlag();
-
-		if (!n) 
-		{
-			if (c || a > 0x99) 
-			{
-				a += 0x60;
-				setCarryFlag();
-			}
-			if (h || (a & 0x0F) > 9) 
-			{
-				a += 0x06;
-			}
-		}
-		else 
-		{ 
-			if (c)
-			{
-				a -= 0x60;
-			}
-			if (h) 
-			{
-				a -= 0x06;
-			}
-		}
-
-		reg.A = a;
-		if (reg.A == 0) {
-			setZeroFlag();
-		}
-		else {
-			unsetZeroFlag();
-		}
-		unsetHalfFlag(); 
-	} break;
-
-	case 0x28: { // jump to e8
-
-		int8_t offset = memory->read(reg.PC);  reg.PC++; // pc = 129
-		if (isZeroFlag())
-		{
-			addCycle();
-			reg.PC += offset;
-		}
-
-	}break;
-	case 0x29: {
-		addWordReg(reg.HL, reg.HL);
-	}break;
-	case 0x2A: {
-		reg.A = memory->read(reg.HL); reg.HL++;
-	}break;
-	case 0x2B: {
-		reg.HL--;
-	}break;
-	case 0x2C: {
-		incByte(reg.L);
-	}break;
-	case 0x2D: {
-		decByte(reg.L);
-	}break;
-	case 0x2E: {
-		reg.L = memory->read(reg.PC);  reg.PC++;
-	}break;
-	case 0x2F: {   // COMPLEMENT
-		setNegFlag();
-		setHalfFlag();
-		reg.A = ~reg.A;
-
-	}break;
-
-	//====0x3?===================================================
-
-	case 0x30: {
-		int8_t offset = static_cast<int8_t>(memory->read(reg.PC));
-		reg.PC++; // pc = 129
-		if (!isCarryFlag())
-		{
-			addCycle();
-			reg.PC += offset;
-		}
-	}break;
-
-
-	case 0x31: { // load into bc, n16
-		reg.SP = readWord(reg.PC); reg.PC+=2;
-	}break;
-	case 0x32: { // write into address BC, A
-		memory->write(reg.HL, reg.A);
-		reg.HL--;
-	}break;
-	case 0x33: {
-		reg.SP++;
-	}break;
-	case 0x34: { // increment whatever hl is pointing to by 1
-		uint8_t byte = memory->read(reg.HL); // this one wont increment
-		incByte(byte);
-		memory->write(reg.HL, byte);
-		//UNSURE IF I SHOULD INCREMENT PROGRAM COUNTER FROM HERE 
-	}break;
-	case 0x35: {
-		uint8_t byte = memory->read(reg.HL); 
-		decByte(byte);
-		memory->write(reg.HL, byte);
-	}break;
-	case 0x36: {
-		memory->write(reg.HL, memory->read(reg.PC));  reg.PC++;// load into address hl, data held in next pc
-	}break;
-	case 0x37: { // SCF (confusing one)
-		bool z = isZeroFlag();
-		clearFlags();
-		setCarryFlag();
-		if (z) setZeroFlag();
-	}break;
-	case 0x38: { // jump to e8
-
-		int8_t offset = memory->read(reg.PC);  reg.PC++; // pc = 129
-		if (isCarryFlag())
-		{
-			addCycle();
-			reg.PC += offset;
-		}
-
-	}break;
-	case 0x39: {
-		addWordReg(reg.HL, reg.SP);
-	}break;
-	case 0x3A: {
-		reg.A = memory->read(reg.HL);
-		reg.HL--;
-	}break;
-	case 0x3B: {
-		reg.SP--;
-	}break;
-	case 0x3C: {
-		incByte(reg.A);
-	}break;
-	case 0x3D: {
-		decByte(reg.A);
-	}break;
-	case 0x3E: {
-		reg.A = memory->read(reg.PC);  reg.PC++;
-	}break;
-	case 0x3F: {   // CCF
-
-		bool z = isZeroFlag();
-		bool c = isCarryFlag();
-		clearFlags();
-		if (z) setZeroFlag();
-		if (!c)setCarryFlag();
-	}break;
-
-	//====0x4?========THIS IS START OF LD A B======================================
-
-	case 0x40: { 
-		reg.B = reg.B;
-	} break;
-	case 0x41: {
-		reg.B = reg.C;
-	} break;
-	case 0x42: {
-		reg.B = reg.D;
-	} break;
-	case 0x43: {
-		reg.B = reg.E;
-	} break;
-	case 0x44: {
-		reg.B = reg.H;
-	} break;
-	case 0x45: {
-		reg.B = reg.L;
-	} break;
-	case 0x46: {//hl pointer 
-		reg.B = memory->read(reg.HL);
-	} break;
-	case 0x47: {
-		reg.B = reg.A;
-	} break;
-	case 0x48: {
-		reg.C = reg.B;
-	} break;
-	case 0x49: {
-		reg.C = reg.C;
-	} break;
-	case 0x4A: {
-		reg.C = reg.D;
-	} break;
-	case 0x4B: {
-		reg.C = reg.E;
-	} break;
-	case 0x4C: {
-		reg.C = reg.H;
-	} break;
-	case 0x4D: {
-		reg.C = reg.L;
-	} break;
-	case 0x4E: {
-		reg.C = memory->read(reg.HL);
-	} break;
-	case 0x4F: {
-		reg.C = reg.A;
-	} break;
-
-	//====0x5?==================================================================
-
-	case 0x50: {
-		reg.D = reg.B;
-	} break;
-	case 0x51: {
-		reg.D = reg.C;
-	} break;
-	case 0x52: {
-		reg.D = reg.D;
-	} break;
-	case 0x53: {
-		reg.D = reg.E;
-	} break;
-	case 0x54: {
-		reg.D = reg.H;
-	} break;
-	case 0x55: {
-		reg.D = reg.L;
-	} break;
-	case 0x56: {//hl pointer 
-		reg.D = memory->read(reg.HL);
-	} break;
-	case 0x57: {
-		reg.D = reg.A;
-	} break;
-	case 0x58: {
-		reg.E = reg.B;
-	} break;
-	case 0x59: {
-		reg.E = reg.C;
-	} break;
-	case 0x5A: {
-		reg.E = reg.D;
-	} break;
-	case 0x5B: {
-		reg.E = reg.E;
-	} break;
-	case 0x5C: {
-		reg.E = reg.H;
-	} break;
-	case 0x5D: {
-		reg.E = reg.L;
-	} break;
-	case 0x5E: {
-		reg.E = memory->read(reg.HL);
-	} break;
-	case 0x5F: {
-		reg.E = reg.A;
-	} break;
-
-	//====0x6?==================================================================
-
-	case 0x60: {
-		reg.H = reg.B;
-	} break;
-	case 0x61: {
-		reg.H = reg.C;
-	} break;
-	case 0x62: {
-		reg.H = reg.D;
-	} break;
-	case 0x63: {
-		reg.H = reg.E;
-	} break;
-	case 0x64: {
-		reg.H = reg.H;
-	} break;
-	case 0x65: {
-		reg.H = reg.L;
-	} break;
-	case 0x66: {//hl pointer 
-		reg.H = memory->read(reg.HL);
-	} break;
-	case 0x67: {
-		reg.H = reg.A;
-	} break;
-	case 0x68: {
-		reg.L = reg.B;
-	} break;
-	case 0x69: {
-		reg.L = reg.C;
-	} break;
-	case 0x6A: {
-		reg.L = reg.D;
-	} break;
-	case 0x6B: {
-		reg.L = reg.E;
-	} break;
-	case 0x6C: {
-		reg.L = reg.H;
-	} break;
-	case 0x6D: {
-		reg.L = reg.L;
-	} break;
-	case 0x6E: {
-		reg.L = memory->read(reg.HL);
-	} break;
-	case 0x6F: {
-		reg.L = reg.A;
-	} break;
-
-	//====0x7?==================================================================
-
-	case 0x70: {
-		memory->write(reg.HL, reg.B);
-	} break;
-	case 0x71: {
-		memory->write(reg.HL, reg.C);
-	} break;
-	case 0x72: {
-		memory->write(reg.HL, reg.D);
-	} break;
-	case 0x73: {
-		memory->write(reg.HL, reg.E);
-	} break;
-	case 0x74: {
-		memory->write(reg.HL, reg.H);
-	} break;
-	case 0x75: {
-		memory->write(reg.HL, reg.L);
-	} break;
-	case 0x76: { // TODO : THIS
-		if (IME) {
-
-			halted = true;
-		}
-		else {
-
-			uint8_t IF = memory->read(0xFF0F);
-			uint8_t IE = memory->read(0xFFFF);
-			if (!(IF & IE & 0x1F)) {
-				reg.PC--;
-			}
-		}
-	} break;
-	case 0x77: {
-		memory->write(reg.HL, reg.A);
-	} break;
-	case 0x78: {
-		reg.A = reg.B;
-	} break;
-	case 0x79: {
-		reg.A = reg.C;
-	} break;
-	case 0x7A: {
-		reg.A = reg.D;
-	} break;
-	case 0x7B: {
-		reg.A = reg.E;
-	} break;
-	case 0x7C: {
-		reg.A = reg.H;
-	} break;
-	case 0x7D: {
-		reg.A = reg.L;
-	} break;
-	case 0x7E: {
-		reg.A = memory->read(reg.HL);
-	} break;
-	case 0x7F: {
-		reg.A = reg.A;
-	} break;
-
-	//====0x8?==================================================================
-
-	case 0x80: {
-		addByteReg(reg.A, reg.B);
-	} break;
-	case 0x81: {
-		addByteReg(reg.A, reg.C);
-	} break;
-	case 0x82: {
-		addByteReg(reg.A, reg.D);
-	} break;
-	case 0x83: {
-		addByteReg(reg.A, reg.E);
-	} break;
-	case 0x84: {
-		addByteReg(reg.A, reg.H);
-	} break;
-	case 0x85: {
-		addByteReg(reg.A, reg.L);
-	} break;
-	case 0x86: {
-		addByteReg(reg.A, memory->read(reg.HL));
-	} break;
-	case 0x87: {
-		addByteReg(reg.A, reg.A);
-	} break;
-	case 0x88: { // start of ADC (add w/ carry flag)
-		addCarryByteReg(reg.A, reg.B);
-	} break;
-	case 0x89: {
-		addCarryByteReg(reg.A, reg.C);
-	} break;
-	case 0x8A: {
-		addCarryByteReg(reg.A, reg.D);
-	} break;
-	case 0x8B: {
-		addCarryByteReg(reg.A, reg.E);
-	} break;
-	case 0x8C: {
-		addCarryByteReg(reg.A, reg.H); 
-	} break;
-	case 0x8D: {
-		addCarryByteReg(reg.A, reg.L);
-	} break;
-	case 0x8E: {
-		addCarryByteReg(reg.A, memory->read(reg.HL));
-	} break;
-	case 0x8F: {
-		addCarryByteReg(reg.A, reg.A);
-	} break;
-
-	//====0x9?======SUB========================================================
-
-	case 0x90: {
-		subByteReg(reg.A, reg.B);
-	} break;
-	case 0x91: {
-		subByteReg(reg.A, reg.C);
-	} break;
-	case 0x92: {
-		subByteReg(reg.A, reg.D);
-	} break;
-	case 0x93: {
-		subByteReg(reg.A, reg.E);
-	} break;
-	case 0x94: {
-		subByteReg(reg.A, reg.H);
-	} break;
-	case 0x95: {
-		subByteReg(reg.A, reg.L);
-	} break;
-	case 0x96: {
-		subByteReg(reg.A, memory->read(reg.HL));
-	} break;
-	case 0x97: {
-		subByteReg(reg.A, reg.A);
-	} break;
-	case 0x98: { // start of ADC (add w/ carry flag)
-		subCarryByteReg(reg.A, reg.B);
-	} break;
-	case 0x99: {
-		subCarryByteReg(reg.A, reg.C);
-	} break;
-	case 0x9A: {
-		subCarryByteReg(reg.A, reg.D);
-	} break;
-	case 0x9B: {
-		subCarryByteReg(reg.A, reg.E);
-	} break;
-	case 0x9C: {
-		subCarryByteReg(reg.A, reg.H);
-	} break;
-	case 0x9D: {
-		subCarryByteReg(reg.A, reg.L);
-	} break;
-	case 0x9E: {
-		subCarryByteReg(reg.A, memory->read(reg.HL));
-	} break;
-	case 0x9F: {
-		subCarryByteReg(reg.A, reg.A);
-	} break;
-
-	//====0xA?======AND XOR====================================================
-
-	case 0xA0: {
-		andByteReg(reg.A, reg.B);
-	} break;
-	case 0xA1: {
-		andByteReg(reg.A, reg.C);
-	} break;
-	case 0xA2: {
-		andByteReg(reg.A, reg.D);
-	} break;
-	case 0xA3: {
-		andByteReg(reg.A, reg.E);
-	} break;
-	case 0xA4: {
-		andByteReg(reg.A, reg.H);
-	} break;
-	case 0xA5: {
-		andByteReg(reg.A, reg.L);
-	} break;
-	case 0xA6: {
-		andByteReg(reg.A, memory->read(reg.HL));
-	} break;
-	case 0xA7: {
-		andByteReg(reg.A, reg.A);
-	} break;
-	case 0xA8: { // start of ADC (add w/ carry flag)
-		xorByteReg(reg.A, reg.B);
-	} break;
-	case 0xA9: {
-		xorByteReg(reg.A, reg.C);
-	} break;
-	case 0xAA: {
-		xorByteReg(reg.A, reg.D);
-	} break;
-	case 0xAB: {
-		xorByteReg(reg.A, reg.E);
-	} break;
-	case 0xAC: {
-		xorByteReg(reg.A, reg.H);
-	} break;
-	case 0xAD: {
-		xorByteReg(reg.A, reg.L);
-	} break;
-	case 0xAE: {
-		xorByteReg(reg.A, memory->read(reg.HL));
-	} break;
-	case 0xAF: {
-		xorByteReg(reg.A, reg.A);
-	} break;
-
-	//====0xB?======OR   CP====================================================
-
-	case 0xB0: {
-		orByteReg(reg.A, reg.B);
-	} break;
-	case 0xB1: {
-		orByteReg(reg.A, reg.C);
-	} break;
-	case 0xB2: {
-		orByteReg(reg.A, reg.D);
-	} break;
-	case 0xB3: {
-		orByteReg(reg.A, reg.E);
-	} break;
-	case 0xB4: {
-		orByteReg(reg.A, reg.H);
-	} break;
-	case 0xB5: {
-		orByteReg(reg.A, reg.L);
-	} break;
-	case 0xB6: {
-		orByteReg(reg.A, memory->read(reg.HL));
-	} break;
-	case 0xB7: {
-		orByteReg(reg.A, reg.A);
-	} break;
-	case 0xB8: { // start of ADC (add w/ carry flag)
-		compareByteReg(reg.A, reg.B);
-	} break;
-	case 0xB9: {
-		compareByteReg(reg.A, reg.C);
-	} break;
-	case 0xBA: {
-		compareByteReg(reg.A, reg.D);
-	} break;
-	case 0xBB: {
-		compareByteReg(reg.A, reg.E);
-	} break;
-	case 0xBC: {
-		compareByteReg(reg.A, reg.H);
-	} break;
-	case 0xBD: {
-		compareByteReg(reg.A, reg.L);
-	} break;
-	case 0xBE: {
-		compareByteReg(reg.A, memory->read(reg.HL));
-	} break;
-	case 0xBF: {//these are the same so just set flags here
-		clearFlags();
-		setZeroFlag();
-		setNegFlag();
-	} break;
-
-	//====0xC?======end of repetitive regs====================================================
-
-	case 0xC0: { // ret NZ 
-		if (!isZeroFlag())
-		{
-			addCycle(3);
-			reg.PC = popStack();
-		}
-	} break;
-	case 0xC1: {
-		reg.BC = popStack();
-	} break;
-	case 0xC2: {
-		uint16_t addr = readWord(reg.PC); reg.PC+=2;
-		if (!isZeroFlag())
-		{
-			addCycle();
-			reg.PC = addr;
-		}
-	} break;
-	case 0xC3: {
-		uint16_t addr = readWord(reg.PC); 
-
-		reg.PC+=2;
-		reg.PC = addr;
-	} break;
-	case 0xC4: {//call nz a16
-		uint16_t addr = readWord(reg.PC); reg.PC+=2;
-		if (!isZeroFlag())
-		{
-			addCycle(3);
-			call(addr);
-		}
-	} break;
-	case 0xC5: { // push BC 
-		push(reg.BC);
-	} break;
-	case 0xC6: { //ADD A n8
-		addByteReg(reg.A, memory->read(reg.PC));  reg.PC++;
-	} break;
-	case 0xC7: { //RST $00
-		std::cout<<"RESET CALLED	"<<std::endl;
-		call(0x00);
-	} break;
-	case 0xC8: { 
-		if (isZeroFlag())
-		{
-			addCycle(3);
-			reg.PC = popStack();
-		}
-	} break;
-	case 0xC9: {
-	//RETURN SUBROUTINE
-		reg.PC = popStack();
-	} break;
-	case 0xCA: {
-		uint16_t addr = readWord(reg.PC); reg.PC+=2;
-		if (isZeroFlag())
-		{
-			addCycle();
-			reg.PC = addr;
-		}
-	} break;
-	case 0xCB: { 
-
-		uint8_t opcodeCB = memory->read(reg.PC);  reg.PC++;
-		//minimum added cycle of 8 by the looks of things
-		addCycle(2); //(does this include that fetch ?)
-		executePrefix(opcodeCB);
-	} break;
-	case 0xCC: {
-		uint16_t addr = readWord(reg.PC); reg.PC+=2;
-		if (isZeroFlag())
-		{
-			addCycle(3);
-			call(addr);
-		}
-	} break;
-	case 0xCD: { 
-		uint16_t jumpAddr = readWord(reg.PC); reg.PC+=2;
-		call(jumpAddr);
-	} break;
-	case 0xCE: {
-		addCarryByteReg(reg.A, memory->read(reg.PC));  reg.PC++;
-	} break;
-	case 0xCF: {
-		call(0x08);
-	} break;
-
-	//====0xD?===============================================================
-
-	case 0xD0: { // ret NZ 
-		if (!isCarryFlag())
-		{
-			addCycle(3);
-			reg.PC = popStack();
-		}
-	} break;
-	case 0xD1: {
-		reg.DE = popStack();
-	} break;
-	case 0xD2: {
-		uint16_t addr = readWord(reg.PC); reg.PC+=2;
-		if (!isCarryFlag())
-		{
-			addCycle();
-			reg.PC = addr;
-		}
-	} break;
-	case 0xD3: { //DO NOTHING
-	
-	} break;
-	case 0xD4: {//call nc a16
-		uint16_t addr = readWord(reg.PC); reg.PC+=2;
-		if (!isCarryFlag())
-		{
-			addCycle(3);
-			call(addr);
-		}
-	} break;
-	case 0xD5: { // push BC 
-		push(reg.DE);
-	} break;
-	case 0xD6: { //SUB A n8
-		subByteReg(reg.A, memory->read(reg.PC));  reg.PC++;
-	} break;
-	case 0xD7: { //RST $10
-		call(0x10);
-	} break;
-	case 0xD8: {
-		if (isCarryFlag())
-		{
-			addCycle(3);
-			reg.PC = popStack();
-		}
-	} break;
-	case 0xD9: {
-		//RETURN I  SUBROUTINE
-		reg.PC = popStack();
-		IME = true;
-	} break;
-	case 0xDA: {
-		uint16_t addr = readWord(reg.PC); reg.PC+=2;
-		if (isCarryFlag())
-		{
-			addCycle(1);
-			reg.PC = addr;
-		}
-	} break;
-	case 0xDB: { //empty
-	} break;
-	case 0xDC: {
-		uint16_t addr = readWord(reg.PC); reg.PC += 2;
-		if (isCarryFlag())
-		{
-			addCycle(3);
-			call(addr);
-		}
-	} break;
-	case 0xDD: { // empty
-	} break;
-	case 0xDE: {
-		subCarryByteReg(reg.A, memory->read(reg.PC));  reg.PC++;
-	} break;
-	case 0xDF: {
-		call(0x18);
-	} break;
-
-			 //====0xE?===============================================================
-
-	case 0xE0: { // LDH [a8] a
-		uint8_t addr = memory->read(reg.PC);  reg.PC++;
-		uint16_t memAddr = addr + 0xFF00; // not sure on this part
-		memory->write(memAddr, reg.A);
-	} break;
-	case 0xE1: {
-		reg.HL = popStack();
-	} break;
-	case 0xE2: {
-		uint16_t memAddr = reg.C + 0xFF00; // not sure on this part
-		memory->write(memAddr, reg.A);
-	} break;
-	case 0xE3: { //DO NOTHING
-	} break;
-	case 0xE4: {//DO NOTHING
-	} break;
-	case 0xE5: { // push HL
-		push(reg.HL);
-	} break;
-	case 0xE6: { //AND A n8
-		andByteReg(reg.A, memory->read(reg.PC));  reg.PC++;
-	} break;
-	case 0xE7: { //RST $10
-		call(0x20);
-	} break;
-	case 0xE8: {//add sp ,e8
-		int8_t e8 = memory->read(reg.PC);  reg.PC++;
-		addWordRegSigned(reg.SP, e8);
-		unsetZeroFlag();
-	} break;
-	case 0xE9: {
-		reg.PC = reg.HL;
-	} break;
-	case 0xEA: { // load to a16
-		uint16_t addr = readWord(reg.PC); reg.PC += 2;
-		memory->write(addr, reg.A);
-	} break;
-	case 0xEB: { //empty
-	} break;
-	case 0xEC: { //empty
-	} break;
-	case 0xED: { // empty
-	} break;
-	case 0xEE: {
-		xorByteReg(reg.A, memory->read(reg.PC));  reg.PC++;
-	} break;
-	case 0xEF: {
-		call(0x28);
-	} break;
-
-	//====0xF?===============================================================
-
-	case 0xF0: { // LDH  a [a8] 
-		uint8_t offset = memory->read(reg.PC++);
-		uint16_t io_addr = 0xFF00 + offset;
-		reg.A = memory->read(io_addr);
-	} break;
-	case 0xF1: {
-		uint16_t val = popStack();
-		reg.A = (val >> 8);
-		reg.F = (val & 0xFF) & 0xF0; 
-	} break;
-	case 0xF2: { // this might be wrong
-		uint16_t io_addr = 0xFF00 + reg.C;
-		reg.A = memory->read(io_addr);
-	} break;
-	case 0xF3: { // DI (what does this mean)
-		IME = false;
-	} break;
-	case 0xF4: {//DO NOTHING
-	} break;
-	case 0xF5: { // push AF
-		push(reg.AF);
-	} break;
-	case 0xF6: { //AND A n8
-		orByteReg(reg.A, memory->read(reg.PC));  reg.PC++;
-	} break;
-	case 0xF7: { //RST $10
-		call(0x30);
-	} break;
-	case 0xF8: {//load into reg.hl, SP + e8
-		int8_t byte = memory->read(reg.PC);  reg.PC++;
-		clearFlags();
-		if ((reg.SP & 0xF) + (byte & 0xF) > 0xF) setHalfFlag();
-		if ((reg.SP & 0xFF) + (byte & 0xFF) > 0xFF) setCarryFlag();
-		reg.HL = reg.SP + byte;
-	} break;
-	case 0xF9: {
-		reg.SP = reg.HL;
-	} break;
-	case 0xFA: { // load into a , [16]
-		uint16_t tempAddr = readWord(reg.PC); reg.PC+=2;
-		reg.A = memory->read(tempAddr);
-	} break;
-	case 0xFB: { 
-		IME_nextCycle = true;
-	} break;
-	case 0xFC: { //empty
-	} break;
-	case 0xFD: { // empty
-	} break;
-	case 0xFE: {
-		uint8_t operand = memory->read(reg.PC++); // for debugging,since i think this is broken
-		compareByteReg(reg.A, operand);
-	} break;
-	case 0xFF: {
-		call(0x38);
-	} break;
-
-	default: {
-		printf("No opcode implemented for : %d", opcode);
-	}break;
+	if (getC() || (!getN() && A > 0x99))
+	{
+		correction |= 0x60;
+		setCarry = true;
 	}
-	/*									/*
-	*	end of giant switch statement	 *
-	*/									//
 
+	if (getN())
+	{
+		A -= correction;
+	}
+	else
+	{
+		A += correction;
+	}
 
+	setZ(A == 0);
+	setH(false);
+	setC(setCarry);
 }
 
-void SM83::reset()
+uint16_t SM83::add16(uint16_t a, uint16_t b)
 {
-	reg.PC = 0; // put this to 0x100 for skipping boot rom
-	reg.SP = 0xFFFE;
-	reg.AF = 0;
-	reg.BC = 0;
-	reg.DE = 0;
-	reg.HL = 0;
-	IME = 0;
-}
+	int result = a + b;
+	setN(false);
+	setH((a & 0x0FFF) + (b & 0x0FFF) > 0x0FFF);
+	setC(result > 0xFFFF);
+	return result & 0xFFFF;
+};
 
-
-uint8_t IF{};
-uint8_t IE{};
-
-void SM83::handleInterrupts() // ive got IF set to 2 when it should be 0 somehow
+uint16_t SM83::addSP()
 {
-	if (!IME && !halted) return;
+	int8_t offset = (int8_t)read8();
+	int result = SP + offset;
+	setZ(false);
+	setN(false);
+	setH((SP & 0x0F) + (offset & 0x0F) > 0x0F);
+	setC((SP & 0xFF) + (offset & 0xFF) > 0xFF);
+	return result & 0xFFFF;
+};
+
+void SM83::handleInterrupts()
+{
+	if (!IME && !isHalted) return;
 
 	uint8_t IF = memory->read(0xFF0F);
 	uint8_t IE = memory->read(0xFFFF);
+	uint8_t triggered = IF & IE & 0x1F;
 
-	if (!IME) return;
+	if (triggered)
+	{
+		isHalted = false;
 
-	if (IF& IE & 0x1F) {
-
-		halted = false;
-		if (IME) {
+		if (IME)
+		{
 			IME = false;
 
-			for (int i = 0; i < 5; i++) {
-				if ( (IF & IE & 0x1F) & (1 << i)) {
+			for (int i = 0; i < 5; i++)
+			{
+				if (triggered & (1 << i))
+				{
 					memory->write(0xFF0F, IF & ~(1 << i));
-					push(reg.PC);
-					reg.PC = 0x40 + (i * 8);
+					push(PC);
+					PC = 0x40 + (i * 8);
 					cycles += 20;
 					break;
 				}
 			}
 		}
-	}
-
-}
-
-
-
-
-
-uint16_t previousOP{};
-
-
-uint8_t opcode{};
-
-uint8_t SM83::executeInstruction()
-{
-
-
-	//if (!halted)
-	//{
-	//logCPUState();
-	//}
-	cycles = 0;
-	if (halted) {
-		std::cout << "HALTED" << std::endl;
-		cycles += 4;
-
-		if (IF & IE & 0x1F) {
-			halted = false;
-
-			if (!IME) {
-				reg.PC--;
-			}
-		}
-		return 1;
-	}
-
-	opcode = memory->read(reg.PC);
-	reg.PC++;
-
-	execute(opcode); // decode - execute
-
-	cycles += opcodeCycles[opcode];
-
-	return cycles;
-}
-
-
-
-uint16_t SM83::getPC()
-{
-	return reg.PC;
-}
-
-uint8_t SM83::getLastOP()
-{
-	return opcode;
-}
-
-void SM83::logCPUState() {
-	std::ostringstream oss;
-	oss << std::hex << std::uppercase << std::setfill('0');
-	oss << "A:" << std::setw(2) << static_cast<int>(reg.A) << " " << "F:" << std::setw(2) << static_cast<int>(reg.F) << " ";
-	oss << "B:" << std::setw(2) << static_cast<int>(reg.B) << " " << "C:" << std::setw(2) << static_cast<int>(reg.C) << " ";
-	oss << "D:" << std::setw(2) << static_cast<int>(reg.D) << " " << "E:" << std::setw(2) << static_cast<int>(reg.E) << " ";
-	oss << "H:" << std::setw(2) << static_cast<int>(reg.H) << " " << "L:" << std::setw(2) << static_cast<int>(reg.L) << " ";
-	oss << "SP:" << std::setw(4) << reg.SP << " " << "PC:" << std::setw(4) << static_cast<int>(previousOP) << " ";
-	oss << "PCMEM:" << std::setw(2) << static_cast<int>(memory->read(previousOP)) << "," << std::setw(2) << static_cast<int>(memory->read(previousOP + 1)) << "," << std::setw(2) << static_cast<int>(memory->read(previousOP + 2)) << "," << std::setw(2) << static_cast<int>(memory->read(previousOP + 3));
-
-	std::ofstream file("02B.txt", std::ios::app);
-	if (file.is_open()) {
-		file << oss.str() << '\n';
 	}
 }

@@ -16,7 +16,7 @@ public:
 	int divCounter;
 	int timaCounter;
 private:
-	
+
 
 };
 #endif

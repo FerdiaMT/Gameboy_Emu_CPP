@@ -42,47 +42,51 @@ TAC (0xFF07): Timer Control, it has the following structure:
 
 //953.674316406 nanosecond wait period per machine cycle 
 
-Clock::Clock(Memory *memory) : memory(memory), divCounter(0), timaCounter(0) // 1 machine cycle = 4 clock cycles (t)
+Clock::Clock(Memory* memory) : memory(memory), divCounter(0), timaCounter(0) // 1 machine cycle = 4 clock cycles (t)
 {
-    // basically we want to advance clock cycles, and then see what we should do
+	// basically we want to advance clock cycles, and then see what we should do
 }
 
-void Clock::step(int amt) {
+void Clock::step(int amt)
+{
 
-    divCounter += amt;
+	divCounter += amt;
 
-    while (divCounter >= 256)
-    {
-        divCounter -= 256;
-        uint8_t div = memory->read(0xFF04);
-        memory->io[0x04] = div + 1;
-    } 
-    
-    uint8_t tac = memory->read(0xFF07);
+	while (divCounter >= 256)
+	{
+		divCounter -= 256;
+		uint8_t div = memory->read(0xFF04);
+		memory->io[0x04] = div + 1;
+	}
 
-    if (tac & 0b100)
-    {
-        int bit = 0;
-        switch (tac & 0b11)
-        {
-        case 0: bit = 1024; break;
-        case 1: bit = 16; break;
-        case 2: bit = 64; break;
-        case 3: bit = 256; break;
-        }
+	uint8_t tac = memory->read(0xFF07);
 
-        timaCounter += amt;
+	if (tac & 0b100)
+	{
+		int bit = 0;
+		switch (tac & 0b11)
+		{
+		case 0: bit = 1024; break;
+		case 1: bit = 16; break;
+		case 2: bit = 64; break;
+		case 3: bit = 256; break;
+		}
 
-        while (timaCounter >= bit) {
-            timaCounter -= bit;
-            uint8_t tima = memory->read(0xFF05);
-            if (tima == 0xFF)
-            {
-                memory->write(0xFF05, memory->read(0xFF06));
-                memory->write(0xFF0F, (memory->read(0xFF0F)) | 0x04);
-            } else {
-                memory->write(0xFF05, tima + 1);
-            }
-        }
-    }
+		timaCounter += amt;
+
+		while (timaCounter >= bit)
+		{
+			timaCounter -= bit;
+			uint8_t tima = memory->read(0xFF05);
+			if (tima == 0xFF)
+			{
+				memory->write(0xFF05, memory->read(0xFF06));
+				memory->write(0xFF0F, (memory->read(0xFF0F)) | 0x04);
+			}
+			else
+			{
+				memory->write(0xFF05, tima + 1);
+			}
+		}
+	}
 }

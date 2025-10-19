@@ -30,17 +30,17 @@ const int SCALE = 5;
 
 
 uint8_t pixelState[160][144]{}; // for now this can be 0,1,2,3,4
-bool keyboardState[6]{true,true,true,true,true,true};
+bool keyboardState[6]{ true,true,true,true,true,true };
 
 /*
 Todo:
 
-    OAM transfer 
-    STAT reg
-    replace view with read in cpu
+	OAM transfer
+	STAT reg
+	replace view with read in cpu
 */
 uint8_t bootRO[256] = {
-    0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
+	0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
 0x11, 0x3E, 0x80, 0x32, 0xE2, 0x0C, 0x3E, 0xF3, 0xE2, 0x32, 0x3E, 0x77, 0x77, 0x3E, 0xFC, 0xE0,
 0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1A, 0xCD, 0x95, 0x00, 0xCD, 0x96, 0x00, 0x13, 0x7B,
 0xFE, 0x34, 0x20, 0xF3, 0x11, 0xD8, 0x00, 0x06, 0x08, 0x1A, 0x13, 0x22, 0x23, 0x05, 0x20, 0xF9,
@@ -59,92 +59,115 @@ uint8_t bootRO[256] = {
 };
 
 uint8_t headerRO[0x30] = {
-    0xCE, 0xED, 0x66 ,0x66 ,0xCC ,0x0D ,0x00 ,0x0B, 0x03 ,0x73, 0x00 ,0x83 ,0x00,0x0C,0x00, 0x0D,
-    0x00, 0x08 ,0x11 ,0x1F ,0x88 ,0x89, 0x00, 0x0E, 0xDC ,0xCC ,0x6E ,0xE6 ,0xDD, 0xDD, 0xD9 ,0x99,
-    0xBB, 0xBB, 0x67 ,0x63, 0x6E, 0x0E ,0xEC ,0xCC ,0xDD ,0xDC, 0x99 ,0x9F, 0xBB, 0xB9, 0x33, 0x3E
+	0xCE, 0xED, 0x66 ,0x66 ,0xCC ,0x0D ,0x00 ,0x0B, 0x03 ,0x73, 0x00 ,0x83 ,0x00,0x0C,0x00, 0x0D,
+	0x00, 0x08 ,0x11 ,0x1F ,0x88 ,0x89, 0x00, 0x0E, 0xDC ,0xCC ,0x6E ,0xE6 ,0xDD, 0xDD, 0xD9 ,0x99,
+	0xBB, 0xBB, 0x67 ,0x63, 0x6E, 0x0E ,0xEC ,0xCC ,0xDD ,0xDC, 0x99 ,0x9F, 0xBB, 0xB9, 0x33, 0x3E
 };
 
 
 
 void setupSDL()
 {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
-    {
-        std::cerr << "SDL could not initialize" << SDL_GetError();
-        return;
-    }
+	if (SDL_Init(SDL_INIT_VIDEO) < 0)
+	{
+		std::cerr << "SDL could not initialize" << SDL_GetError();
+		return;
+	}
 
-    window = SDL_CreateWindow("DMG", WIDTH * SCALE, HEIGHT * SCALE, SDL_WINDOW_RESIZABLE);
-    if (!window)
-    {
-        std::cerr << "Window couldnt be created " << SDL_GetError();
-        return;
-    }
+	window = SDL_CreateWindow("DMG", WIDTH * 6, HEIGHT * 6, 0);
+	if (!window)
+	{
+		std::cerr << "Window couldnt be created " << SDL_GetError();
+		return;
+	}
 
-    renderer = SDL_CreateRenderer(window, NULL);
-    if (!renderer)
-    {
-        std::cerr << "Renderer couldnt be created " << SDL_GetError();
-        SDL_Quit;
-        return;
-    }
+	renderer = SDL_CreateRenderer(window, nullptr);
+	if (!renderer)
+	{
+		std::cerr << "Renderer couldnt be created " << SDL_GetError();
+		SDL_Quit;
+		return;
+	}
 
-    texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,SDL_TEXTUREACCESS_STREAMING, 160, 144);
+	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, 160, 144);
 
-    if (!texture)
-    {
-        std::cerr << "texture couldnt be created " << SDL_GetError();
-        SDL_Quit;
-        return;
-    }
+	if (!texture)
+	{
+		std::cerr << "texture couldnt be created " << SDL_GetError();
+		SDL_Quit;
+		return;
+	}
 
 }
 
 int main()
 {
-    setupSDL();
+	setupSDL();
+	Gameboy gb;
+	if (!gb.loadROM("pokemonSilver.gbc"))
+	{
+		std::cout << "COULDNT FIND ROM";
+	}
 
-    Gameboy gb;
+	SDL_Event event;
 
-    if (!gb.loadROM("drMar.gb"))
-    {
-        std::cout << "COULDNT FIND ROM";
-    }
- 
-    SDL_Event event;
+	int frameCount = 0;
+	auto lastTime = std::chrono::high_resolution_clock::now();
+	auto lastFrameTime = std::chrono::high_resolution_clock::now();
+	const double TARGET_FRAME_TIME = 16.67; //1000ms / 60 - so this makes 60fps
 
-    while(running)
-    {
+	while (running)
+	{
+		auto frameStart = std::chrono::high_resolution_clock::now();
 
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT) {
-                running = false;
-            }
-            else if (event.type == SDL_EVENT_KEY_DOWN) {
-                gb.input.keyDown(event.key.scancode);
-            }
-            else if (event.type == SDL_EVENT_KEY_UP) {
-                gb.input.keyUp(event.key.scancode);
-            }
-        }
+		while (SDL_PollEvent(&event))
+		{
+			if (event.type == SDL_EVENT_QUIT)
+			{
+				running = false;
+			}
+			else if (event.type == SDL_EVENT_KEY_DOWN)
+			{
+				gb.input.keyDown(event.key.scancode);
+			}
+			else if (event.type == SDL_EVENT_KEY_UP)
+			{
+				gb.input.keyUp(event.key.scancode);
+			}
+		}
 
-        for(int i = 0; i < 70224; i+= gb.cpu.cycles)
-        {
-            gb.step();
-        }
+		for (int i = 0; i < 70224; i += gb.cpu.cycles)
+		{
+			gb.step();
+		}
 
-        SDL_UpdateTexture(texture, nullptr, gb.ppu.framebuffer, 160 * sizeof(uint32_t));
-        SDL_RenderClear(renderer);
-        SDL_RenderTexture(renderer, texture, nullptr, nullptr);
-        SDL_RenderPresent(renderer);
+		SDL_UpdateTexture(texture, nullptr, gb.ppu.framebuffer, 160 * sizeof(uint32_t));
+		SDL_RenderClear(renderer);
+		SDL_RenderTexture(renderer, texture, nullptr, nullptr);
+		SDL_RenderPresent(renderer);
 
-        SDL_Delay(16); // this delays it enough to act as 60fps
 
-    }
-    SDL_DestroyTexture(texture);
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+		frameCount++;
+		auto now = std::chrono::high_resolution_clock::now();
+		auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - lastTime).count();
+		if (elapsed >= 1)
+		{
+			std::cout << "FPS: " << frameCount << std::endl;
+			frameCount = 0;
+			lastTime = now;
+		}
 
+		auto frameEnd = std::chrono::high_resolution_clock::now();
+		double frameTime = std::chrono::duration<double, std::milli>(frameEnd - frameStart).count();
+
+		if (frameTime < TARGET_FRAME_TIME)
+		{
+			SDL_Delay(static_cast<Uint32>(TARGET_FRAME_TIME - frameTime));
+		}
+	}
+	SDL_DestroyTexture(texture);
+	SDL_DestroyRenderer(renderer);
+	SDL_DestroyWindow(window);
+	SDL_Quit();
 	return 0;
 }
