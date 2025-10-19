@@ -42,106 +42,51 @@ TAC (0xFF07): Timer Control, it has the following structure:
 
 //953.674316406 nanosecond wait period per machine cycle 
 
-Clock::Clock(Memory & memory) : memory(memory) // 1 machine cycle = 4 clock cycles (t)
+Clock::Clock(Memory* memory) : memory(memory), divCounter(0), timaCounter(0) // 1 machine cycle = 4 clock cycles (t)
 {
-    // basically we want to advance clock cycles, and then see what we should do
+	// basically we want to advance clock cycles, and then see what we should do
 }
 
-void Clock::resetClock()
+void Clock::step(int amt)
 {
-}
 
-int modulo{};
+	divCounter += amt;
 
-uint8_t Tac{};
+	while (divCounter >= 256)
+	{
+		divCounter -= 256;
+		uint8_t div = memory->read(0xFF04);
+		memory->io[0x04] = div + 1;
+	}
 
-void Clock::fetchTac()
-{
-    Tac = memory.ioFetchTAC();
-}
+	uint8_t tac = memory->read(0xFF07);
 
-int tacModulo()
-{
-    if (Tac & 0b00)
-    {
-        return 256;
-    }
-    if (Tac & 0b01)
-    {
-        return 4;
-    }
-    if (Tac & 0b10)
-    {
-        return 16;
-    }
-    return 64;
-}
+	if (tac & 0b100)
+	{
+		int bit = 0;
+		switch (tac & 0b11)
+		{
+		case 0: bit = 1024; break;
+		case 1: bit = 16; break;
+		case 2: bit = 64; break;
+		case 3: bit = 256; break;
+		}
 
-int clockCycle{};
+		timaCounter += amt;
 
-
-void Clock::resetClockCycle()
-{
-    //clockCycle = 0;
-}
-
-
-int timaReloadDelay = -1;
-bool timaWillReload = false;
-
-
-void Clock::executeTick()
-{
-    uint16_t prevDivCounter = divCounter;
-    divCounter++;
-    memory.ioWriteDIV(static_cast<uint8_t>(divCounter >> 8));
-
-    fetchTac();
-
-    if (Tac & 0b100)
-    {
-        int bit = 0;
-        switch (Tac & 0b11)
-        {
-        case 0: bit = 9; break;
-        case 1: bit = 3; break;
-        case 2: bit = 5; break;
-        case 3: bit = 7; break;
-        }
-
-        bool prevBit = ((prevDivCounter >> bit) & 1) != 0;
-        bool currBit = ((divCounter >> bit) & 1) != 0;
-
-        if (prevBit && !currBit)
-        {
-            if (!timaWillReload)
-            {
-                uint8_t tima = memory.ioFetchTIMA();
-                if (tima == 0xFF)
-                {
-                    memory.ioWriteTIMA(0x00);
-                    timaReloadDelay = 4;
-                    timaWillReload = true;
-                }
-                else
-                {
-                    memory.ioIncrementTIMA();
-                }
-            }
-        }
-    }
-
-
-    if (timaReloadDelay >= 0)
-    {
-        timaReloadDelay--;
-        if (timaReloadDelay == 0)
-        {
-            memory.ioWriteTIMA(memory.ioFetchTMA());
-            memory.requestInterrupt(0x04);
-            timaWillReload = false;
-            timaReloadDelay = -1;
-        }
-    }
-
+		while (timaCounter >= bit)
+		{
+			timaCounter -= bit;
+			uint8_t tima = memory->read(0xFF05);
+			if (tima == 0xFF)
+			{
+				memory->write(0xFF05, memory->read(0xFF06));
+				memory->write(0xFF0F, (memory->read(0xFF0F)) | 0x04);
+			}
+			else
+			{
+				memory->write(0xFF05, tima + 1);
+			}
+		}
+	}
 }
